@@ -1,0 +1,2031 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Blok Oyun Motoru</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#0d1117;color:#e6edf3;font-family:system-ui,-apple-system,sans-serif;user-select:none;-webkit-user-select:none}
+#app{position:fixed;inset:0;display:flex;flex-direction:column}
+/* Telefon ters tutulduğunda arayüz 90° döner: oyun yatay, editör dikey görünür */
+body.rot #app{inset:auto;top:0;left:100vw;width:100vh;height:100vw;transform:rotate(90deg);transform-origin:0 0}
+#top{display:flex;gap:6px;padding:6px;background:#161b22;overflow-x:auto;flex-shrink:0;align-items:center}
+button,select,input,textarea{font:inherit;color:inherit}
+button{background:#21262d;border:1px solid #30363d;border-radius:8px;padding:8px 10px;touch-action:manipulation;white-space:nowrap}
+button.on{background:#1f6feb;border-color:#1f6feb}
+button.danger{background:#6e2121;border-color:#8b2c2c}
+input,select,textarea{background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:6px;min-width:0}
+input[type=number]{width:70px}
+input[type=color]{padding:2px;width:44px;height:34px}
+textarea{width:100%;font:13px/1.4 monospace;min-height:200px}
+#main{flex:1;display:flex;min-height:0}
+#palette{display:none;width:92px;flex-shrink:0;overflow-y:auto;background:#161b22;padding:4px;flex-direction:column;gap:4px}
+body.mode-edit #palette{display:flex}
+#palette button{display:flex;align-items:center;gap:6px;font-size:13px;padding:6px;text-align:left}
+.sw{width:18px;height:18px;border-radius:4px;flex-shrink:0;border:1px solid rgba(255,255,255,.25)}
+#stage{position:relative;flex:1;min-height:0;overflow:hidden}
+#cv{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
+body.mode-play .edit-only{display:none!important}
+#playUI{display:none;position:absolute;inset:0;pointer-events:none;z-index:4}
+#btnMenu{position:absolute;top:8px;right:8px;pointer-events:auto;z-index:5;padding:6px 10px}
+body.mode-play #playUI,body.hud-edit #playUI{display:block}
+.hud{position:absolute;pointer-events:auto;touch-action:none}
+body.hud-edit .hud{outline:2px dashed #58a6ff;outline-offset:4px;cursor:move}
+#joy{position:relative;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.2)}
+#knob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:rgba(255,255,255,.35);pointer-events:none}
+.pad{display:grid;grid-template-columns:auto auto;gap:8px;align-items:center;justify-items:center}
+#btnQ{grid-column:1 / 3;grid-row:1}
+#btnX{grid-column:1;grid-row:2}#btnE{grid-column:2;grid-row:2}
+#btnA{grid-column:1;grid-row:3}#btnZ{grid-column:2;grid-row:3}
+.pad button{width:56px;height:56px;border-radius:50%;font-weight:700;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.25)}
+#btnA{width:74px;height:74px;font-size:24px}
+#btnA.hot,#btnX.hot{background:#1f6feb;border-color:#58a6ff}
+#hotbar{display:flex;gap:3px}
+.slot{width:34px;height:34px;background:rgba(13,17,23,.88);border:2px solid #30363d;border-radius:6px;font-size:9px;line-height:1.1;display:flex;align-items:center;justify-content:center;text-align:center;overflow:hidden;padding:1px}
+.slot.sel{border-color:#58a6ff}
+#hudBtns,#saveUI{display:flex;gap:6px}
+#hudBtns button,#saveUI button{padding:6px 8px;font-size:13px;background:rgba(33,38,45,.92)}
+#dlg{display:none;position:absolute;left:8px;right:8px;bottom:8px;background:rgba(22,27,34,.97);border:1px solid #30363d;border-radius:12px;padding:12px;z-index:5}
+#dlg.show{display:block}
+#dName{font-weight:700;color:#79c0ff;margin-bottom:4px}
+#dText{font-size:16px;line-height:1.4;margin-bottom:10px;min-height:2.8em}
+#dChoices{display:flex;flex-direction:column;gap:6px}
+#dChoices button{text-align:left;white-space:normal}
+#toast{position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);background:rgba(0,0,0,.78);padding:8px 14px;border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9;white-space:nowrap}
+#toast.show{opacity:1}
+#modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20;align-items:flex-end;justify-content:center}
+#modal.show{display:flex}
+#mbox{width:100%;max-width:560px;max-height:88%;overflow:auto;background:#161b22;border-radius:14px 14px 0 0;padding:12px;display:flex;flex-direction:column;gap:10px}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.hint{font-size:12px;color:#8b949e;line-height:1.4}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.cell{min-height:52px;background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:4px;font-size:12px;display:flex;align-items:center;justify-content:center;text-align:center}
+.cell.hb{border-color:#58a6ff}
+.cell.sel{background:#1f6feb}
+.embedded #top{display:none}
+/* Oyun modunda üst çubuk gizlenir, alan oyuna kalır (düzenleme için Durdur menüsü) */
+body.mode-play #top{display:none}
+</style>
+</head>
+<body class="mode-edit">
+<div id="app">
+  <div id="top">
+    <button id="btnPlay">▶ Oyna</button>
+    <button id="btnEdit" class="on">✎ Düzenle</button>
+    <select id="sceneSel" class="edit-only"></select>
+    <button id="btnAddScene" class="edit-only">+ Sahne</button>
+    <button id="btnScene" class="edit-only">⚙ Sahne</button>
+    <button id="btnHud" class="edit-only">🧩 HUD</button>
+    <button id="btnRecipe" class="edit-only">📖 Tarifler</button>
+    <button id="btnExport" class="edit-only">HTML indir</button>
+    <button id="btnBackup" class="edit-only">Yedek</button>
+    <button id="btnLoad" class="edit-only">Yükle</button>
+  </div>
+  <div id="main">
+    <div id="palette"></div>
+    <div id="stage">
+      <canvas id="cv"></canvas>
+      <div id="playUI">
+        <div class="hud" data-hud="joy"><div id="joy"><div id="knob"></div></div></div>
+        <div class="hud" data-hud="actions" id="actions">
+          <div class="pad">
+            <button id="btnX">X</button><button id="btnE">E</button><button id="btnQ">Q</button>
+            <button id="btnA">A</button><button id="btnZ">Z</button>
+          </div>
+        </div>
+        <div class="hud" data-hud="hotbar" id="hotbar"></div>
+        <div class="hud" data-hud="hudBtns" id="hudBtns">
+          <button id="btnQuest">📜 Görevler</button>
+        </div>
+        <button id="btnMenu">⏸ Durdur</button>
+        <div class="hud" data-hud="saveUI" id="saveUI">
+          <button id="btnSaveGame">💾 Kaydet</button>
+          <button id="btnLoadGame">📂 Yükle</button>
+          <button id="btnNewGame">🔄 Baştan</button>
+        </div>
+      </div>
+      <div id="dlg"><div id="dName"></div><div id="dText"></div><div id="dChoices"></div></div>
+      <div id="toast"></div>
+    </div>
+  </div>
+</div>
+<div id="modal"><div id="mbox">
+  <div class="row"><b id="mtitle" style="flex:1"></b><button id="mclose">Kapat</button></div>
+  <div id="mbody"></div>
+</div></div>
+<input type="file" id="fileIn" accept="application/json" hidden>
+
+<script>
+let EMBED = /*EMBED*/null;
+
+const T = 32;
+const PLAYER_COLOR = '#4fc3f7';
+const SLOTS = 18, HOTBAR = 9, STACK = 64;
+const TILE = {
+  1: {name: 'Taş',   color: '#55657a', solid: true},
+  2: {name: 'Su',    color: '#2b6cb0', solid: true},
+  3: {name: 'Ağaç',  color: '#2f5d31', solid: true},
+  4: {name: 'Çim',   color: '#4c9a3d'},
+  5: {name: 'Kum',   color: '#d9c27e'},
+  6: {name: 'Ahşap', color: '#7a4f2b'},
+  7: {name: 'Kutu',  color: '#b07a2e', solid: true},
+  8: {name: 'Yol',   color: '#8b8f96'},
+  9: {name: 'Diken',  color: '#6b7280', hurt: 8},  // geçilebilir, üstünde durunca can götürür
+  10: {name: 'Ateş', color: '#7a2e0e', hurt: 10}  // geçilebilir, üstünde durunca yakar
+};
+const PMAX = 100;
+const PAL = [
+  {k: 'select', label: 'Seç'}, {k: 'erase', label: 'Sil'},
+  {k: 'tile:1'}, {k: 'tile:2'}, {k: 'tile:3'}, {k: 'tile:7'},
+  {k: 'tile:4'}, {k: 'tile:5'}, {k: 'tile:6'}, {k: 'tile:8'}, {k: 'tile:9'},
+  {k: 'npc', label: 'NPC', color: '#ffb74d'}, {k: 'exit', label: 'Çıkış', color: '#ffd54f'},
+  {k: 'spawn', label: 'Başlangıç', color: '#9cffb8'},
+  {k: 'item', label: 'Eşya', color: '#ffd700'}, {k: 'sign', label: 'Tabela', color: '#c8a165'},
+  {k: 'enemy', label: 'Düşman', color: '#e35d5d'},
+  {k: 'rain', label: 'Yağmur', color: '#90caf9'},
+  {k: 'fire', label: 'Ateş', color: '#ff7043'},
+  {k: 'bench', label: 'Tezgâh', color: '#8d6e63'}
+];
+// HUD öğeleri: stage'in sol-üst köşesine göre konum oranı (0..1)
+const HUD_KEYS = ['joy', 'actions', 'hotbar', 'hudBtns', 'saveUI'];
+const DEFAULT_HUD = {
+  joy:     {x: 0.03, y: 0.62},
+  actions: {x: 0.62, y: 0.50},
+  hotbar:  {x: 0.10, y: 0.88},
+  hudBtns: {x: 0.03, y: 0.02},
+  saveUI:  {x: 0.50, y: 0.02}
+};
+// Yatay (geniş) ekran için varsayılan yerler; oyun yatayken bunlar kullanılır
+const DEFAULT_HUD_LAND = {
+  joy:     {x: 0.03, y: 0.45},
+  actions: {x: 0.78, y: 0.30},
+  hotbar:  {x: 0.18, y: 0.78},
+  hudBtns: {x: 0.03, y: 0.03},
+  saveUI:  {x: 0.45, y: 0.03}
+};
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d'), btnA = $('btnA');
+
+let P, cur, curId, mode = 'edit', tool = 'tile:1', sel = null, modalClose = null;
+let W = 1, H = 1, dpr = 1, zoom = 1, cam = {x: 0, y: 0};
+let player = {x: 0, y: 0}, exitCool = 0, dlg = null;
+let fade = 0, fadeDir = 0, pending = null;
+let actionReq = false, interactReq = false, dashReq = false;
+let dash = 0, dashCool = 0, face = {x: 0, y: 1};
+let nGoal = {}, ePos = {}, atkCool = 0, pHurtCool = 0, walkT = 0, hitFlash = 0;   // nGoal: yürüyen NPC'lerin hedefi   // düşman konumları (oturum içi), zamanlayıcılar
+const keys = {}, joyV = {x: 0, y: 0};
+let painting = false, lastKey = null, last = performance.now();
+let state = freshState();   // oyun sırasında: görevler, slotlar, seçili slot, alınan eşyalar
+let drag = null;            // HUD sürükleme
+
+function freshState() { return {quests: {}, slots: new Array(SLOTS).fill(null), hb: 0, picked: {}, unlocked: {}, hp: PMAX, eh: {}, np: {}, obj: {}, out: {}, fol: {}, loc: {}, hunger: PMAX, thirst: PMAX}; }
+function normState(s) {
+  s = s || {};
+  const slots = new Array(SLOTS).fill(null);
+  (s.slots || []).forEach((v, k) => { if (k < SLOTS) slots[k] = v; });
+  return {quests: s.quests || {}, slots, hb: s.hb || 0, picked: s.picked || {}, unlocked: s.unlocked || {},
+    hp: s.hp == null ? PMAX : s.hp, eh: s.eh || {}, np: s.np || {}, obj: s.obj || {}, out: s.out || {}, fol: s.fol || {}, loc: s.loc || {},
+    hunger: s.hunger == null ? PMAX : s.hunger, thirst: s.thirst == null ? PMAX : s.thirst};
+}
+function hudEdit() { return document.body.classList.contains('hud-edit'); }
+function uiBusy() { return !!dlg || $('modal').classList.contains('show'); }
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+function newId() { return 'o' + Math.random().toString(36).slice(2, 9); }
+
+/* ---------- veri ---------- */
+function borderTiles(w, h) {
+  const t = new Array(w * h).fill(0);
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++)
+    if (i === 0 || j === 0 || i === w - 1 || j === h - 1) t[j * w + i] = 1;
+  return t;
+}
+function defaultProject() {
+  return {
+    start: 'koy',
+    scenes: {
+      koy: {name: 'Kasaba', w: 16, h: 12, bg: '#1d2d1f', spawn: {x: 3, y: 6},
+        npcs: [{x: 6, y: 4, name: 'Yaşlı', color: '#ffb74d',
+          text: 'Merhaba yolcu! Bu kasaba çok eski.\n? Kasaba hakkında bilgi ister misin? | (Evet) => Kuzeydeki mağarada bir hazine varmış. | (Hayır) => Peki, iyi yolculuklar.\n@görev başla: Kuzeydeki hazine\nHoşça kal!'}],
+        items: [{id: 'altin1', x: 9, y: 8, name: 'Altın', n: 5}],
+        signs: [{x: 5, y: 2, text: 'Kuzey yolu: mağara. Dikkatli ol!'}],
+        exits: [{x: 15, y: 6, to: 'orman'}]},
+      orman: {name: 'Orman', w: 16, h: 12, bg: '#0f2a1a', spawn: {x: 2, y: 6},
+        npcs: [{x: 10, y: 6, name: 'Tüccar', color: '#e57373',
+          text: 'Hoş geldin! Buradaki en iyi kılıçlar bende.\n? Bir kılıç almak ister misin? | (Evet) => @eşya ver: Kılıç | (Hayır) => Belki sonra gelirsin.\nAfiyet olsun.'}],
+        items: [], signs: [],
+        exits: [{x: 0, y: 6, to: 'koy'}]}
+    }
+  };
+}
+function sanitize(p) {
+  p.scenes = p.scenes || {};
+  for (const id in p.scenes) {
+    const s = p.scenes[id];
+    s.name = s.name || id; s.w = s.w || 16; s.h = s.h || 12;
+    s.bg = s.bg || '#1d2d1f'; s.npcs = s.npcs || []; s.exits = s.exits || [];
+    s.items = s.items || []; s.signs = s.signs || [];
+    s.enemies = s.enemies || [];
+    s.rains = s.rains || [];
+    s.fires = s.fires || [];
+    for (const f of s.fires) f.id = f.id || newId();
+    s.benches = s.benches || [];
+    for (const en of s.enemies) {
+      en.id = en.id || newId(); en.name = en.name || 'Düşman';
+      en.hp = en.hp || 30; en.dmg = en.dmg == null ? 10 : en.dmg; en.color = en.color || '#e35d5d';
+    }
+    s.spawn = s.spawn || {x: 1, y: 1};
+    for (const n of s.npcs) { n.id = n.id || newId(); n.text = n.text || ''; }
+    for (const it of s.items) it.id = it.id || newId();
+    for (const sg of s.signs) sg.text = sg.text || '';
+    if (!s.tiles || s.tiles.length !== s.w * s.h) s.tiles = borderTiles(s.w, s.h);
+    for (const e of s.exits) {
+      e.id = e.id || newId();
+      if (e.x >= 0 && e.y >= 0 && e.x < s.w && e.y < s.h) s.tiles[e.y * s.w + e.x] = 0;
+    }
+  }
+  if (!p.scenes[p.start]) p.start = Object.keys(p.scenes)[0];
+  if (!p.id) p.id = 'p' + Math.random().toString(36).slice(2, 10);
+  p.recipesRaw = p.recipesRaw || '';
+  p.hud = p.hud || {};
+  for (const k of HUD_KEYS) if (!p.hud[k]) p.hud[k] = {...DEFAULT_HUD[k]};
+  p.hudL = p.hudL || {};
+  for (const k of HUD_KEYS) if (!p.hudL[k]) p.hudL[k] = {...DEFAULT_HUD_LAND[k]};
+  return p;
+}
+const KEY = 'oyun-motoru-v2';
+function save() { if (EMBED) return; try { localStorage.setItem(KEY, JSON.stringify(P)); } catch (e) {} }
+function load() { try { return JSON.parse(localStorage.getItem(KEY)); } catch (e) { return null; } }
+function changed() { save(); }
+
+/* ---------- oyun kaydı (HTML export'ta da çalışır) ---------- */
+function gameSaveKey() { return 'oyun-kayit-' + P.id; }
+function readSave() {
+  try { return JSON.parse(localStorage.getItem(gameSaveKey())); } catch (e) { return null; }
+}
+function saveGame() {
+  try {
+    localStorage.setItem(gameSaveKey(), JSON.stringify({scene: curId, x: player.x, y: player.y, state, t: Date.now()}));
+    toast('Oyun kaydedildi');
+  } catch (e) { toast('Kayıt yapılamadı'); }
+}
+// Oyun başlarken: kayıt varsa en son kayıt yerinden, yoksa Başlangıç sahnesinin Başlangıç bloğundan
+function startPlay() {
+  closeDlg(); fade = 0; fadeDir = 0; pending = null;
+  dash = 0; dashCool = 0; face = {x: 0, y: 1};
+  const d = readSave();
+  if (d && P.scenes[d.scene]) {
+    curId = d.scene; cur = P.scenes[curId];
+    player.x = d.x; player.y = d.y; exitCool = 0.6; ePos = {}; nGoal = {};
+    state = normState(d.state);
+  } else {
+    state = freshState();
+    loadScene(P.start);
+  }
+  renderHotbar();
+}
+function loadGame() {
+  if (!readSave()) return toast('Kayıtlı oyun yok');
+  startPlay();
+  toast('Kayıt yüklendi');
+}
+function newGame() {
+  closeDlg(); fade = 0; fadeDir = 0; pending = null;
+  state = freshState();
+  loadScene(P.start);
+  renderHotbar();
+  toast('Yeni oyun başladı');
+}
+
+/* ---------- sahne ve fizik ---------- */
+function loadScene(id, sp) {
+  curId = id; cur = P.scenes[id];
+  const s = sp || cur.spawn;
+  player.x = s.x * T + T / 2; player.y = s.y * T + T / 2;
+  exitCool = 0.6; ePos = {}; nGoal = {};
+}
+function solid(i, j) {
+  if (i < 0 || j < 0 || i >= cur.w || j >= cur.h) return true;
+  if (lockedExitAt(i, j)) return true;
+  const v = cur.tiles[j * cur.w + i];
+  return !!(TILE[v] && TILE[v].solid);
+}
+// Kilitli ve henüz açılmamış çıkış, duvar gibi davranır
+function lockedExitAt(i, j) {
+  return cur.exits.find(e => e.x === i && e.y === j && e.lock && !state.unlocked[e.id]) || null;
+}
+const R = T * 0.36;
+function blocked(x, y) {
+  const x0 = Math.floor((x - R) / T), x1 = Math.floor((x + R - 1e-6) / T);
+  const y0 = Math.floor((y - R) / T), y1 = Math.floor((y + R - 1e-6) / T);
+  for (let j = y0; j <= y1; j++) for (let i = x0; i <= x1; i++) if (solid(i, j)) return true;
+  return false;
+}
+function moveBy(dx, dy, sp) {
+  const nx = player.x + dx * sp; if (!blocked(nx, player.y)) player.x = nx;
+  const ny = player.y + dy * sp; if (!blocked(player.x, ny)) player.y = ny;
+}
+function inputVec() {
+  let x = joyV.x, y = joyV.y;
+  if (keys.arrowleft || keys.a) x -= 1;
+  if (keys.arrowright || keys.d) x += 1;
+  if (keys.arrowup || keys.w) y -= 1;
+  if (keys.arrowdown || keys.s) y += 1;
+  const m = Math.hypot(x, y);
+  if (m > 1) { x /= m; y /= m; }
+  return {x, y};
+}
+function nearest(list) {
+  let best = null, bd = 1.2 * T;
+  for (const o of list) {
+    const d = Math.hypot(o.x * T + T / 2 - player.x, o.y * T + T / 2 - player.y);
+    if (d < bd) { bd = d; best = o; }
+  }
+  return best;
+}
+function nearNpc() {
+  let best = null, bd = 1.2 * T;
+  for (const n of sceneNpcs()) {
+    const p = npcPos(n), d = Math.hypot(p.x - player.x, p.y - player.y);
+    if (d < bd) { bd = d; best = n; }
+  }
+  return best;
+}
+function nearestInteractable() {
+  return nearest(cur.items.filter(o => !state.picked[o.id])) || nearest(cur.signs);
+}
+// Çıkış: hedef sahnenin Başlangıç bloğunda (sp = null) belirir
+function changeScene(id, sp) { pending = {id, sp}; fadeDir = 1; sfx('door'); }
+
+/* ---------- diyalog ve komutlar ---------- */
+// Satır türleri: normal metin, "? Soru | (A) => cevap" seçenekli soru, "@komut" görev/eşya komutu
+function parseLine(line) {
+  // {koşul} ile başlayan satır, koşul sağlanırsa gösterilir (ör. {görev bitti: Ad} Teşekkürler!)
+  const cm = line.match(/^\{(.+?)\}\s*(.*)$/);
+  if (cm && cm[1].trim() !== 'name') { const it = parseLine(cm[2]); it.cond = cm[1].trim(); return it; }
+  if (line[0] === '@') return {cmd: line};
+  if (line[0] === '?') {
+    const parts = line.slice(1).split('|').map(s => s.trim());
+    const q = parts.shift();
+    const opts = parts.map(p => {
+      const m = p.match(/^\((.*?)\)\s*=>\s*(.*)$/);
+      return m ? {label: m[1].trim(), resp: m[2].trim()} : null;
+    }).filter(Boolean);
+    return opts.length ? {q, opts} : {text: q};
+  }
+  return {text: line};
+}
+function parseScript(src) {
+  return src.split('\n').map(s => s.trim()).filter(Boolean).map(parseLine);
+}
+// @görev başla: Ad | @görev bitir: Ad | @eşya ver: Ad [adet] | @eşya al: Ad [adet]
+// Koşul: görev aktif/bitti/yok, ya da eşya (adet)
+function condMet(c) {
+  const m = c.match(/^(görev aktif|görev bitti|görev yok|görev var|eşya)\s*:\s*(.+)$/i);
+  if (!m) return true;
+  const k = m[1].toLowerCase(), arg = m[2].trim();
+  if (k === 'görev aktif') return state.quests[arg] === 'aktif';
+  if (k === 'görev bitti') return state.quests[arg] === 'bitti';
+  if (k === 'görev yok') return !state.quests[arg];
+  if (k === 'görev var') return !!state.quests[arg];
+  const mm = arg.match(/^(.*?)\s*(?::\s*|\s+)(\d+)$/);
+  const name = mm ? mm[1].trim() : arg, n = mm ? +mm[2] : 1;
+  return countItem(name) >= n;
+}
+// "Ad | alış | satış" satırlarından mağaza listesi
+// Dördüncü sütun eşya türü: "yemek 10" (can doldurur) ya da "silah 20" (hasar verir)
+function parseShop(raw) {
+  return (raw || '').split('\n').map(l => l.split('|').map(s => s.trim())).filter(p => p[0]).map(p => {
+    const t = (p[3] || '').match(/^(yemek|silah|içecek)\s*(\d+)?$/i);
+    const kind = t ? kindWord(t[1]) : null;
+    return {
+      name: p[0], buy: +p[1] || 0,
+      sell: p[2] !== undefined && p[2] !== '' ? +p[2] : Math.floor((+p[1] || 0) / 2),
+      kind, val: t && t[2] ? +t[2] : 10
+    };
+  });
+}
+function runCmd(line) {
+  // @takip et / @takip bırak → konuşan NPC oyuncuyu takip eder ya da durur (aynı sahnede)
+  if (/^@takip\s+et\s*$/i.test(line)) { if (dlg && dlg.npc) state.fol[dlg.npc.id] = true; return; }
+  if (/^@takip\s+b[ıi]rak\s*$/i.test(line)) {
+    const npc = dlg && dlg.npc;
+    if (npc && state.fol[npc.id]) {
+      const p = npcPos(npc);
+      delete state.fol[npc.id]; delete folRt[npc.id];
+      state.np[npc.id] = {x: Math.floor(p.x / T), y: Math.floor(p.y / T)};
+    }
+    return;
+  }
+  if (/^@mağaza\s*$/i.test(line)) { if (dlg && dlg.npc) dlg.openShop = dlg.npc; return; }
+  // @hedef: Görev | Eşya adet  → görev listesinde ilerleme gösterir
+  const ob = line.match(/^@hedef\s*:\s*(.+?)\s*\|\s*(.+?)\s*(?::\s*|\s+)(\d+)\s*$/i);
+  if (ob) { state.obj[ob[1].trim()] = {name: ob[2].trim(), n: +ob[3]}; return; }
+  // @git x,y  → konuşan NPC belirtilen kareye yürür (diyalog bitince hareket eder)
+  const mv = line.match(/^@git\s*(\d+)\s*,\s*(\d+)\s*$/i);
+  if (mv) {
+    const npc = dlg && dlg.npc;
+    if (!npc) return toast('Bu konuşmada NPC yok');
+    nGoal[npc.id] = {x: +mv[1], y: +mv[2], path: null};
+    return;
+  }
+  const m = line.match(/^@(görev başla|görev bitir|eşya ver|eşya al)\s*:\s*(.+)$/i);
+  if (!m) return;
+  const kind = m[1].toLowerCase(), arg = m[2].trim();
+  if (kind === 'görev başla') {
+    if (!state.quests[arg]) { state.quests[arg] = 'aktif'; toast('Yeni görev: ' + arg); sfx('quest'); }
+  } else if (kind === 'görev bitir') {
+    if (state.quests[arg] && state.quests[arg] !== 'bitti') { state.quests[arg] = 'bitti'; toast('Görev tamamlandı: ' + arg); sfx('quest'); }
+  } else {
+    // Adet biçimleri: "Altın 5", "Altın :5", "Altın: 5"
+    const mm = arg.match(/^(.*?)\s*(?::\s*|\s+)(\d+)$/);
+    const name = mm ? mm[1].trim() : arg, n = mm ? +mm[2] : 1;
+    if (kind === 'eşya ver') {
+      const d = itemDef(name);
+      const left = addItem(name, n, d.kind, d.val);
+      toast(name + ' × ' + (n - left) + ' alındı' + (left ? ' (envanter dolu)' : ''));
+    } else {
+      const t = removeItem(name, n);
+      if (t > 0) toast(name + ' × ' + t + ' verildi');
+    }
+  }
+}
+function openDialog(n) {
+  const items = parseScript(n.text || '');
+  if (!items.length) return toast('Boş konuşma');
+  dlg = {items, i: 0, name: n.name, npc: n.id ? n : null};
+  $('dlg').classList.add('show');
+  showItem();   // hiç gösterilecek satır yoksa kendi kendini kapatır
+}
+function showItem() {
+  if (!dlg) return;
+  let it = dlg.items[dlg.i];
+  while (it && ((it.cond && !condMet(it.cond)) || it.cmd)) {
+    if (it.cmd && (!it.cond || condMet(it.cond))) runCmd(it.cmd);
+    dlg.i++; it = dlg.items[dlg.i];
+  }
+  if (!it) { const sh = dlg.openShop; closeDlg(); if (sh) openShop(sh); return; }
+  $('dName').textContent = dlg.name;
+  const box = $('dChoices'); box.innerHTML = '';
+  // Metin daktilo efektiyle yazılır, bitince seçenekler/Devam düğmesi çıkar
+  typeText(fillName(it.q || it.text), () => {
+    if (it.opts) {
+      for (const o of it.opts) {
+        box.append(el('button', {textContent: fillName(o.label), on: {click: () => {
+          if (!dlg) return;
+          dlg.i++;
+          if (o.resp) dlg.items.splice(dlg.i, 0, parseLine(o.resp));
+          showItem();
+        }}}));
+      }
+    } else {
+      box.append(el('button', {textContent: 'Devam', on: {click: () => { if (dlg) { dlg.i++; showItem(); } }}}));
+    }
+  });
+}
+function closeDlg() { stopTyping(); dlg = null; $('dChoices').innerHTML = ''; $('dlg').classList.remove('show'); }
+// Mağaza: satın alma altınla, satış envanterdeki eşyayı altına çevirir
+function openShop(npc) {
+  const list = parseShop(npc.shopRaw);
+  if (!list.length) return toast('Mağaza boş');
+  const gold = () => countItem('Altın');
+  const nodes = [el('div', {className: 'hint', textContent: 'Altın: ' + gold()}),
+    el('div', {className: 'hint', textContent: 'Satın al'})];
+  for (const s of list) {
+    nodes.push(row('', btn(s.name + ' — ' + s.buy + ' altın', '', () => {
+      if (gold() < s.buy) return toast('Yeterli altın yok');
+      if (!fits(s.name, 1)) return toast('Envanter dolu');
+      removeItem('Altın', s.buy);
+      const d = s.kind ? {kind: s.kind, val: s.val} : itemDef(s.name);
+      addItem(s.name, 1, d.kind, d.val);
+      openShop(npc);
+    })));
+  }
+  nodes.push(el('div', {className: 'hint', textContent: 'Sat (listede yoksa 1 altın)'}));
+  const names = [...new Set(state.slots.filter(s => s && s.name !== 'Altın').map(s => s.name))];
+  if (!names.length) nodes.push(el('div', {className: 'hint', textContent: 'Satacak eşya yok'}));
+  for (const name of names) {
+    const entry = list.find(x => x.name === name);
+    const price = entry ? entry.sell : 1;
+    nodes.push(row('', btn(name + ' — ' + price + ' altın', '', () => {
+      if (!countItem(name)) return;
+      if (!fits('Altın', price)) return toast('Envanter dolu');
+      removeItem(name, 1);
+      addItem('Altın', price);
+      openShop(npc);
+    })));
+  }
+  openModal('Mağaza: ' + npc.name, nodes);
+}
+/* ---------- hesap (Fiuby), durdur menüsü, {name} ---------- */
+const ACC_KEY = 'oyun-hesap';
+function readAcc() { try { return JSON.parse(localStorage.getItem(ACC_KEY)) || null; } catch (e) { return null; } }
+function writeAcc(a) { try { if (a) localStorage.setItem(ACC_KEY, JSON.stringify(a)); else localStorage.removeItem(ACC_KEY); } catch (e) {} }
+let acc = readAcc();   // {name, fiuby: true|false} ya da null
+function playerName() { return acc && acc.name ? acc.name : 'Oyuncu'; }
+// Dialogdaki {name} yerine oyuncunun adını koyar
+function fillName(s) { return s ? s.replace(/\{name\}/g, playerName()) : s; }
+
+// Fiuby SDK'sı bir kez yüklenir; girişte 'fiuby:login' olayıyla hesap kaydedilir
+let fiubyReady = false;
+function setupFiuby() {
+  if (fiubyReady) return; fiubyReady = true;
+  const s = document.createElement('script');
+  s.src = 'https://fiuby.com/sdk/fiuby-login.js';
+  document.head.append(s);
+  window.addEventListener('fiuby:login', e => {
+    // SDK, kullanıcıyı e.detail.user içinde gönderir
+    const u = (e.detail && e.detail.user) || e.detail || {};
+    acc = {name: u.name || u.display_name || u.preferred_username || 'Oyuncu', fiuby: true};
+    writeAcc(acc);
+    toast('Hoş geldin, ' + acc.name);
+    if ($('modal').classList.contains('show')) closeModal();
+  });
+}
+function fiubyButton() {
+  setupFiuby();
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.setAttribute('data-fiuby-client-id', 'oq6aE5GJngy21ew9HXIjLzE4bPQ656PQ');
+  b.setAttribute('data-fiuby-scopes', 'openid profile display_name avatar');
+  b.setAttribute('data-fiuby-locale', 'tr');
+  b.style.cssText = 'border:0;border-radius:8px;padding:9px 14px;max-width:100%;white-space:normal;background:#287de0;color:white;font:600 14px system-ui;cursor:pointer';
+  b.textContent = 'Fiuby ile Giriş Yap';
+  return b;
+}
+// Oyuna girince bir kez: Fiuby ile giriş penceresi
+let loginAsked = false;
+function maybeLoginPrompt() {
+  if (loginAsked || (acc && acc.fiuby)) return;
+  loginAsked = true;
+  openModal('Fiuby hesabı', [
+    fiubyButton(),
+    btn('Şimdi değil', '', () => closeModal())
+  ]);
+}
+// Çıkış sonrası oyunda kullanılacak ismi sorar
+function askName(prev) {
+  const i = el('input', {type: 'text', value: prev || '', placeholder: 'Oyundaki adın', maxLength: 20});
+  openModal('Oyundaki adın', [
+    el('div', {className: 'hint', textContent: 'Dialoglarda {name} yazan yerlerde bu isim görünecek.'}),
+    i,
+    btn('Kaydet', '', () => {
+      const v = i.value.trim();
+      if (!v) return toast('İsim boş olamaz');
+      acc = {name: v, fiuby: false}; writeAcc(acc);
+      closeModal(); toast('Kaydedildi: ' + v);
+    })
+  ]);
+}
+// Sağ üstteki Durdur menüsü
+function pauseMenu() {
+  const nodes = [btn('▶ Devam et', '', () => closeModal()), btn('💾 Kaydet', '', () => saveGame()),
+    btn('✎ Düzenle', '', () => { closeModal(); setMode('edit'); })];
+  if (acc && acc.fiuby) {
+    nodes.push(el('div', {className: 'hint', textContent: 'Fiuby hesabı: ' + acc.name}));
+    nodes.push(btn("Fiuby'den çıkış yap", '', () => { const prev = acc.name; acc = null; writeAcc(null); askName(prev); }));
+  } else {
+    nodes.push(el('div', {className: 'hint', textContent: 'Oyundaki adın: ' + playerName()}));
+    nodes.push(fiubyButton());
+  }
+  openModal('Durdu', nodes);
+}
+$('btnMenu').addEventListener('click', pauseMenu);
+
+$('dText').addEventListener('click', () => finishTyping());
+
+/* ---------- ses efektleri (tarayıcının kendi sesi, dosya yok) ---------- */
+let actx = null;
+function sfx(type) {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+    const t0 = actx.currentTime;
+    const tone = (f, dur, vol, wave, when) => {
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = wave; o.frequency.value = f;
+      g.gain.setValueAtTime(vol, t0 + when);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + when + dur);
+      o.connect(g); g.connect(actx.destination);
+      o.start(t0 + when); o.stop(t0 + when + dur + 0.02);
+    };
+    if (type === 'talk') tone(520 + Math.random() * 120, 0.04, 0.04, 'square', 0);
+    else if (type === 'pick') { tone(660, 0.07, 0.12, 'sine', 0); tone(990, 0.1, 0.12, 'sine', 0.07); }
+    else if (type === 'eat') { tone(300, 0.08, 0.12, 'triangle', 0); tone(420, 0.08, 0.12, 'triangle', 0.08); tone(560, 0.12, 0.12, 'triangle', 0.16); }
+    else if (type === 'hit') { tone(180, 0.12, 0.18, 'sawtooth', 0); tone(90, 0.14, 0.18, 'sawtooth', 0.05); }
+    else if (type === 'hurt') tone(140, 0.2, 0.2, 'square', 0);
+    else if (type === 'door') { tone(220, 0.15, 0.15, 'triangle', 0); tone(330, 0.2, 0.15, 'triangle', 0.12); }
+    else if (type === 'quest') { tone(523, 0.1, 0.12, 'sine', 0); tone(659, 0.1, 0.12, 'sine', 0.1); tone(784, 0.18, 0.12, 'sine', 0.2); }
+  } catch (e) {}
+}
+
+/* ---------- daktilo efekti (diyalog) ---------- */
+let typing = null;   // {t, full, onDone}
+function typeText(s, onDone) {
+  stopTyping();
+  const out = $('dText'); out.textContent = '';
+  let k = 0;
+  typing = {full: s, onDone, t: setInterval(() => {
+    k++; out.textContent = s.slice(0, k);
+    if (k % 2 === 0) sfx('talk');
+    if (k >= s.length) finishTyping();
+  }, 28)};
+  if (!s.length) finishTyping();
+}
+// Metne dokununca yazı hemen tamamlanır
+function finishTyping() {
+  if (!typing) return;
+  const tp = typing; typing = null;
+  clearInterval(tp.t);
+  $('dText').textContent = tp.full;
+  tp.onDone();
+}
+function stopTyping() { if (typing) { clearInterval(typing.t); typing = null; } }
+
+/* ---------- NPC hareketi ---------- */
+// NPC'nin kayıtlı konumu (yoksa editördeki ilk konumu)
+function npcTile(n) { return state.np[n.id] || {x: n.x, y: n.y}; }
+function npcPos(n) {
+  const t = npcTile(n);
+  return ePos[n.id] || (ePos[n.id] = {x: t.x * T + T / 2, y: t.y * T + T / 2});
+}
+// Kare kare en kısa yol (BFS): duvarların ve kilitli çıkışların etrafından dolanır. Yol yoksa null.
+function findPath(sx, sy, gx, gy) {
+  if (solid(gx, gy)) return null;
+  const W = cur.w, key = (i, j) => j * W + i;
+  const prev = new Map([[key(sx, sy), -1]]);
+  const q = [[sx, sy]];
+  for (let qi = 0; qi < q.length; qi++) {
+    const [x, y] = q[qi];
+    if (x === gx && y === gy) break;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (solid(nx, ny) || prev.has(key(nx, ny))) continue;
+      prev.set(key(nx, ny), key(x, y)); q.push([nx, ny]);
+    }
+  }
+  if (!prev.has(key(gx, gy))) return null;
+  const path = [];
+  let k = key(gx, gy);
+  while (k !== key(sx, sy)) { path.unshift([k % W, Math.floor(k / W)]); k = prev.get(k); }
+  return path;
+}
+// Takip aktif mi: takip açık olmalı ve (varsa) takip koşulu sağlanmalı
+function followActive(n) {
+  return !!state.fol[n.id] && (!n.followCond || condMet(n.followCond));
+}
+// Bu sahnede görünen NPC'ler: kendi sahnesindekiler + başka sahneden takiple gelenler
+function sceneNpcs() {
+  const out = cur.npcs.filter(n => !state.loc[n.id] || state.loc[n.id].scene === curId);
+  for (const id in state.loc) {
+    const L = state.loc[id];
+    if (L.scene === curId && !out.some(n => n.id === id)) out.push(L.npc);
+  }
+  return out;
+}
+// Sahne değişirken takip eden NPC'ler yeni sahneye, oyuncunun varış karesine taşınır
+function moveFollowers(toId, sp) {
+  const arr = sp || P.scenes[toId].spawn;
+  for (const n of sceneNpcs()) {
+    if (!followActive(n)) continue;
+    state.loc[n.id] = {scene: toId, npc: JSON.parse(JSON.stringify(n))};
+    state.np[n.id] = {x: arr.x, y: arr.y};
+    delete ePos[n.id];
+  }
+}
+// Takip eden NPC'ler: oyuncu 1.6 kareden uzaklaşınca yol bulup peşinden gider, yakında durur
+let folRt = {};
+function updateFollowers(dt) {
+  if (uiBusy()) return;
+  for (const n of sceneNpcs()) {
+    if (!state.fol[n.id]) continue;
+    if (!followActive(n)) {
+      // Koşul sağlanmadı: NPC olduğu yerde durur ve konumu kaydedilir
+      const p0 = npcPos(n);
+      state.np[n.id] = {x: Math.floor(p0.x / T), y: Math.floor(p0.y / T)};
+      folRt[n.id] = {path: [], t: 0};
+      continue;
+    }
+    const p = npcPos(n), r = folRt[n.id] || (folRt[n.id] = {path: [], t: 0});
+    const dist = Math.hypot(player.x - p.x, player.y - p.y);
+    r.t -= dt;
+    if (dist < 1.6 * T) { r.path = []; continue; }
+    if (r.t <= 0 || !r.path.length) {
+      r.t = 0.4;   // yolu sık sık yenile ki oyuncu hareket ederken takip sürsün
+      r.path = findPath(Math.floor(p.x / T), Math.floor(p.y / T), Math.floor(player.x / T), Math.floor(player.y / T)) || [];
+    }
+    if (!r.path.length) continue;
+    const wp = r.path[0], wx = wp[0] * T + T / 2, wy = wp[1] * T + T / 2;
+    const dx = wx - p.x, dy = wy - p.y, d = Math.hypot(dx, dy), sp = 80 * dt;
+    if (d <= sp) { p.x = wx; p.y = wy; r.path.shift(); }
+    else { p.x += dx / d * sp; p.y += dy / d * sp; }
+  }
+}
+// Hedefe yürüme: önce yol hesaplanır, sonra kare kare ilerler. Hedef ulaşılamazsa NPC durur.
+function updateNpcs(dt) {
+  if (uiBusy()) return;   // diyalog veya menü açıkken NPC'ler durur
+  for (const n of sceneNpcs()) {
+    if (followActive(n)) continue;   // takip eden NPC devriye gezmez
+    // Hareket alanı tanımlıysa ve NPC diyalogla taşınmadıysa: başlangıç ile hedef arasında gidip gelir
+    if (!nGoal[n.id] && n.moveTo && !state.np[n.id]) nGoal[n.id] = {x: n.moveTo.x, y: n.moveTo.y, patrol: true, home: {x: n.x, y: n.y}, path: null};
+    const g = nGoal[n.id]; if (!g || g.failed) continue;
+    const p = npcPos(n);
+    if (!g.path) {
+      g.path = findPath(Math.floor(p.x / T), Math.floor(p.y / T), g.x, g.y);
+      if (!g.path) { g.failed = true; toast(n.name + ' hedefe ulaşamıyor'); continue; }
+    }
+    if (g.path.length === 0) {
+      // Hedefe varıldı
+      delete nGoal[n.id];
+      if (g.patrol) nGoal[n.id] = {x: g.home.x, y: g.home.y, patrol: true, home: {x: g.x, y: g.y}, path: null};
+      else state.np[n.id] = {x: g.x, y: g.y};
+      continue;
+    }
+    const wp = g.path[0], wx = wp[0] * T + T / 2, wy = wp[1] * T + T / 2;
+    const dx = wx - p.x, dy = wy - p.y, d = Math.hypot(dx, dy), sp = 70 * dt;
+    if (d <= sp) { p.x = wx; p.y = wy; g.path.shift(); }
+    else { p.x += dx / d * sp; p.y += dy / d * sp; }
+  }
+}
+
+/* ---------- kilitli çıkışlar ---------- */
+let lockHint = null;   // aynı kapı için tekrar tekrar uyarı vermemek için
+function countItem(name) {
+  let c = 0;
+  for (const s of state.slots) if (s && s.name === name) c += s.n;
+  return c;
+}
+function lockText(e) {
+  const L = e.lock;
+  return L.kind === 'item' ? L.name + ' × ' + L.n + ' gerekli' : "'" + L.name + "' görevi bitmeli";
+}
+function lockMet(e) {
+  const L = e.lock;
+  return L.kind === 'item' ? countItem(L.name) >= L.n : state.quests[L.name] === 'bitti';
+}
+// Oyuncu kapıya yaklaşınca koşul sağlanıyorsa kapıyı açar (harcama açıksa eşyayı siler)
+function tryUnlocks() {
+  for (const e of cur.exits) {
+    if (!e.lock || state.unlocked[e.id]) continue;
+    const d = Math.hypot(e.x * T + T / 2 - player.x, e.y * T + T / 2 - player.y);
+    if (d < 1.9 * T) {
+      if (lockMet(e)) {
+        if (e.lock.kind === 'item' && e.lock.consume) removeItem(e.lock.name, e.lock.n);
+        state.unlocked[e.id] = true;
+        lockHint = null;
+        toast('Kapı açıldı'); sfx('door');
+      } else if (lockHint !== e.id) {
+        lockHint = e.id;
+        toast('Kilitli: ' + lockText(e));
+      }
+    } else if (lockHint === e.id) lockHint = null;
+  }
+}
+function drawPadlock(x, y) {
+  ctx.fillStyle = '#ffd54f'; ctx.fillRect(x - 6, y - 1, 12, 10);
+  ctx.strokeStyle = '#ffd54f'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(x, y - 2, 5, Math.PI, 0); ctx.stroke();
+}
+
+/* ---------- eşya, envanter ve etkileşim ---------- */
+// Slotlara ekler (önce aynı eşyanın yığınına, sonra boş slota). Kalan adedi döndürür.
+function addItem(name, n, kind, val) {
+  let left = n;
+  for (const s of state.slots) if (s && s.name === name && s.n < STACK && left > 0) {
+    const add = Math.min(STACK - s.n, left); s.n += add; left -= add;
+  }
+  for (let k = 0; k < SLOTS && left > 0; k++) if (!state.slots[k]) {
+    const add = Math.min(STACK, left); state.slots[k] = {name, n: add, kind: kind || 'normal', val: val || 0}; left -= add;
+  }
+  renderHotbar();
+  return left;
+}
+function fits(name, n) {
+  let room = 0;
+  for (let k = 0; k < SLOTS; k++) {
+    const s = state.slots[k];
+    if (!s) room += STACK; else if (s.name === name) room += STACK - s.n;
+  }
+  return room >= n;
+}
+function removeItem(name, n) {
+  let taken = 0;
+  for (let k = 0; k < SLOTS && taken < n; k++) {
+    const s = state.slots[k];
+    if (s && s.name === name) {
+      const t = Math.min(s.n, n - taken);
+      s.n -= t; taken += t;
+      if (!s.n) state.slots[k] = null;
+    }
+  }
+  renderHotbar();
+  return taken;
+}
+/* ---------- can, hasar, düşman ---------- */
+// Eşya türü: normal | food (can doldurur, val = miktar) | weapon (hasar verir, val = hasar)
+function itemDef(name) {
+  for (const id in P.scenes) for (const it of P.scenes[id].items) if (it.name === name && it.kind) return it;
+  return {};
+}
+function removeFromSlot(k, n) {
+  const s = state.slots[k]; if (!s) return;
+  s.n -= n; if (s.n <= 0) state.slots[k] = null;
+  renderHotbar();
+}
+// Açlık ve susuzluk zamanla azalır; biri sıfırsa can kaybettirir
+let starveT = 0;
+// moving: yürürken/koşarken açlık ve susuzluk daha hızlı azalır
+// Açlık ve susuzluk yeterliyken can yavaşça dolar (bedelini açlık öder)
+function updateNeeds(dt, moving) {
+  const walkMul = moving ? 1 : 0;
+  state.hunger = Math.max(0, state.hunger - dt * (0.25 + 0.3 * walkMul));
+  state.thirst = Math.max(0, state.thirst - dt * (0.2 + 0.25 * walkMul));
+  if (state.hp < PMAX && state.hunger >= 30 && state.thirst >= 30) {
+    state.hp = Math.min(PMAX, state.hp + dt * 0.5);
+    state.hunger = Math.max(0, state.hunger - dt * 0.1);
+  }
+  if (state.hunger <= 0 || state.thirst <= 0) {
+    starveT += dt;
+    if (starveT >= 2) { starveT = 0; hurt(5); }
+  } else starveT = 0;
+}
+function enemyAlive(e) { return !(e.id in state.eh && state.eh[e.id] <= 0); }
+function enemyHp(e) { return e.id in state.eh ? state.eh[e.id] : e.hp; }
+function enemyPos(e) { return ePos[e.id] || (ePos[e.id] = {x: e.x * T + T / 2, y: e.y * T + T / 2}); }
+function nearestEnemy(range) {
+  let best = null, bd = range;
+  for (const e of cur.enemies) {
+    if (!enemyAlive(e)) continue;
+    const p = enemyPos(e), d = Math.hypot(p.x - player.x, p.y - player.y);
+    if (d < bd) { bd = d; best = e; }
+  }
+  return best;
+}
+// Hotbar slotu kullanımı: yemek yer, silah ile en yakın düşmana vurur
+function useSlot(k) {
+  const s = state.slots[k];
+  if (!s) return toast('Boş slot');
+  if (s.kind === 'food' || s.kind === 'drink') {
+    // Yemek açlığı doldurur (ve biraz can verir), içecek susuzluğu giderir
+    const isFood = s.kind === 'food', stat = isFood ? 'hunger' : 'thirst';
+    if (state[stat] >= PMAX && (!isFood || state.hp >= PMAX)) return toast('Şu an ihtiyacın yok');
+    const before = state[stat], amount = s.val || 10;
+    state[stat] = Math.min(PMAX, state[stat] + amount);
+    if (isFood) state.hp = Math.min(PMAX, state.hp + Math.round(amount / 2));
+    removeFromSlot(k, 1);
+    toast(s.name + ': +' + Math.round(state[stat] - before) + (isFood ? ' açlık' : ' susuzluk'));
+    sfx('eat');
+  } else if (s.kind === 'weapon') {
+    if (atkCool > 0) return;
+    atkCool = 0.45;
+    const e = nearestEnemy(1.8 * T);
+    if (!e) return toast('Yakında düşman yok');
+    const left = enemyHp(e) - (s.val || 10);
+    state.eh[e.id] = Math.max(0, left);
+    toast(left <= 0 ? e.name + ' yenildi!' : e.name + ': ' + left + ' can');
+    sfx('hit');
+  } else {
+    toast(s.name + ' kullanılamaz');
+  }
+}
+function hurt(n) {
+  if (n <= 0 || pHurtCool > 0) return;
+  pHurtCool = 0.8; hitFlash = 0.25; sfx('hurt');
+  state.hp = Math.max(0, state.hp - n);
+  if (state.hp <= 0) die();
+}
+function die() {
+  closeDlg(); if ($('modal').classList.contains('show')) closeModal();
+  toast('Öldün! Sahnenin başlangıcına dönülüyor');
+  state.hp = PMAX; state.hunger = PMAX; state.thirst = PMAX;
+  loadScene(curId);
+}
+function updateEnemies(dt) {
+  for (const e of cur.enemies) {
+    if (!enemyAlive(e)) continue;
+    const p = enemyPos(e);
+    const dx = player.x - p.x, dy = player.y - p.y, d = Math.hypot(dx, dy);
+    if (d < 4.5 * T && d > 0.6 * T) {
+      const sp = 58 * dt, nx = p.x + dx / d * sp, ny = p.y + dy / d * sp;
+      if (!blocked(nx, p.y)) p.x = nx;
+      if (!blocked(p.x, ny)) p.y = ny;
+    }
+    if (d < (e.boss ? 1.6 : 0.9) * T) hurt(e.dmg);
+  }
+}
+function interact() {
+  const it = nearest(cur.items.filter(o => !state.picked[o.id]));
+  if (it) {
+    if (!fits(it.name, it.n)) return toast('Envanter dolu');
+    addItem(it.name, it.n, it.kind, it.val);
+    state.picked[it.id] = true;
+    toast('Eşya alındı: ' + it.name + ' × ' + it.n);
+    sfx('pick');
+    if (it.onPick) {
+      if (it.onPick.start) runCmd('@görev başla: ' + it.onPick.start);
+      if (it.onPick.finish) runCmd('@görev bitir: ' + it.onPick.finish);
+    }
+    return;
+  }
+  const bn = nearest(cur.benches);
+  if (bn) return openCraft();
+  const sg = nearest(cur.signs);
+  if (sg) return openDialog({name: 'Tabela', text: sg.text});
+  const n = nearNpc();
+  if (n) openDialog(n);
+}
+function selectSlot(k) { state.hb = k; renderHotbar(); }
+function renderHotbar() {
+  const box = $('hotbar'); if (!box) return;
+  box.innerHTML = '';
+  for (let k = 0; k < HOTBAR; k++) {
+    const s = state.slots[k];
+    box.append(el('div', {
+      className: 'slot' + (state.hb === k ? ' sel' : ''),
+      textContent: s ? s.name.slice(0, 5) + (s.n > 1 ? ' ' + s.n : '') : '',
+      on: {click: () => {
+        if (hudEdit()) return;
+        if (mode === 'play' && state.hb === k && !uiBusy()) useSlot(k); else selectSlot(k);
+      }}
+    }));
+  }
+}
+function openInventory() {
+  if (dlg) return;
+  const grid = el('div', {className: 'grid'});
+  state.slots.forEach((s, k) => {
+    grid.append(el('div', {
+      className: 'cell' + (k < HOTBAR ? ' hb' : '') + (state.hb === k && k < HOTBAR ? ' sel' : ''),
+      textContent: s ? s.name + ' × ' + s.n : (k < HOTBAR ? '(' + (k + 1) + ')' : ''),
+      on: {click: () => { if (k < HOTBAR) selectSlot(k); openInventory(); }}
+    }));
+  });
+  openModal('Envanter', [
+    el('div', {className: 'hint', textContent: 'Mavi çerçeveli ilk 9 slot hızlı erişim çubuğudur. Bir slota dokunarak seç.'}),
+    grid
+  ]);
+}
+function showQuests() {
+  const names = Object.keys(state.quests);
+  const nodes = names.length
+    ? names.map(n => {
+        const ob = state.obj[n];
+        const prog = ob ? ' — ' + ob.name + ': ' + Math.min(countItem(ob.name), ob.n) + '/' + ob.n : '';
+        return el('div', {textContent: (state.quests[n] === 'bitti' ? '✔ ' : '• ') + n + (state.quests[n] === 'bitti' ? ' (tamamlandı)' : ' (aktif)') + prog});
+      })
+    : [el('div', {className: 'hint', textContent: 'Henüz görev yok.'})];
+  openModal('Görevler', nodes);
+}
+
+/* ---------- HUD ---------- */
+function applyHud() {
+  for (const k of HUD_KEYS) {
+    const e = document.querySelector(`[data-hud="${k}"]`);
+    // Geniş (yatay) ekranda ayrı yerleşim kullanılır
+    const land = W > H;
+    const p = (land ? (P.hudL || {}) : (P.hud || {}))[k] || (land ? DEFAULT_HUD_LAND : DEFAULT_HUD)[k];
+    if (e) { e.style.left = (p.x * 100) + '%'; e.style.top = (p.y * 100) + '%'; }
+  }
+}
+document.querySelectorAll('[data-hud]').forEach(h => {
+  h.addEventListener('pointerdown', e => {
+    if (!hudEdit()) return;
+    e.preventDefault();
+    const p0 = toLocal(e.clientX, e.clientY), hr = localRect(h);
+    drag = {set: W > H ? 'hudL' : 'hud', key: h.dataset.hud, id: e.pointerId, dx: p0.x - hr.left, dy: p0.y - hr.top, sr: localRect($('stage'))};
+    h.setPointerCapture(e.pointerId);
+  });
+});
+addEventListener('pointermove', e => {
+  if (!drag || e.pointerId !== drag.id) return;
+  const sr = drag.sr;
+  P[drag.set][drag.key] = {
+    x: clamp((toLocal(e.clientX, e.clientY).x - sr.left - drag.dx) / sr.width, 0, 0.95),
+    y: clamp((toLocal(e.clientX, e.clientY).y - sr.top - drag.dy) / sr.height, 0, 0.95)
+  };
+  applyHud();
+});
+const endDrag = () => { if (drag) { drag = null; changed(); } };
+addEventListener('pointerup', endDrag);
+addEventListener('pointercancel', endDrag);
+// HUD düzenlerken düğmelere basılmış gibi davranmasın
+$('playUI').addEventListener('click', e => { if (hudEdit()) { e.stopPropagation(); e.preventDefault(); } }, true);
+
+/* ---------- çizim ---------- */
+// Yatay/dikey: oyun modunda telefon dikeyse, editörde yatayken arayüz 90° döndürülür
+let rotated = false;
+function applyRotation() {
+  const want = mode === 'play' ? innerHeight > innerWidth : innerWidth > innerHeight;
+  const flip = want !== rotated;
+  rotated = want;
+  document.body.classList.toggle('rot', rotated);
+  if (flip) resize();
+  if (P) applyHud();
+}
+// Ekran koordinatını döndürülmüş arayüzün yerel koordinatına çevirir
+function toLocal(x, y) { return rotated ? {x: y, y: innerWidth - x} : {x, y}; }
+function localRect(el) {
+  const r = el.getBoundingClientRect();
+  const a = toLocal(r.left, r.top), b = toLocal(r.right, r.bottom);
+  return {left: Math.min(a.x, b.x), top: Math.min(a.y, b.y), width: Math.abs(b.x - a.x), height: Math.abs(b.y - a.y)};
+}
+function resize() {
+  const r = localRect($('stage'));
+  W = r.width; H = r.height; dpr = window.devicePixelRatio || 1;
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+}
+function updateCam() {
+  if (mode === 'edit') {
+    zoom = Math.min(W / (cur.w * T), H / (cur.h * T)) * 0.92;
+    cam.x = cur.w * T / 2; cam.y = cur.h * T / 2;
+    return;
+  }
+  zoom = W / (10 * T);
+  const vw = W / zoom, vh = H / zoom;
+  cam.x = cur.w * T <= vw ? cur.w * T / 2 : Math.min(Math.max(player.x, vw / 2), cur.w * T - vw / 2);
+  cam.y = cur.h * T <= vh ? cur.h * T / 2 : Math.min(Math.max(player.y, vh / 2), cur.h * T - vh / 2);
+}
+function text(s, x, y, color) {
+  ctx.font = `${12 / zoom}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.lineWidth = 3 / zoom; ctx.strokeStyle = 'rgba(0,0,0,.7)';
+  ctx.strokeText(s, x, y);
+  ctx.fillStyle = color || '#fff'; ctx.fillText(s, x, y);
+}
+// Ağacın altındaki zemin: etrafında (8 komşu) çim varsa çim rengi, yoksa sahnenin arka plan rengi
+function treeGround(i, j) {
+  for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+    if (!di && !dj) continue;
+    const a = i + di, b = j + dj;
+    if (a >= 0 && b >= 0 && a < cur.w && b < cur.h && cur.tiles[b * cur.w + a] === 4) return TILE[4].color;
+  }
+  return cur.bg;
+}
+// Bu karede herhangi bir nesne (NPC, eşya, tabela, düşman, çıkış, yağmur) var mı?
+function hasObjAt(i, j) {
+  return ['npcs', 'items', 'signs', 'enemies', 'exits', 'rains', 'fires', 'benches'].some(k => cur[k].some(o => o.x === i && o.y === j));
+}
+// Boş kare (nesne altı veya alınmış eşyanın yeri): önce çim, yoksa en çok görülen komşu malzeme, yoksa arka plan
+function emptyGround(i, j) {
+  const cnt = {};
+  for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+    if (!di && !dj) continue;
+    const a = i + di, b = j + dj;
+    if (a < 0 || b < 0 || a >= cur.w || b >= cur.h) continue;
+    const v = cur.tiles[b * cur.w + a];
+    if (!v || v === 3 || v === 9 || v === 10 || !TILE[v]) continue;   // boşluk, ağaç, diken ve ateş komşu sayılmaz
+    if (v === 4) return TILE[4].color;
+    cnt[v] = (cnt[v] || 0) + 1;
+  }
+  let best = 0, bestN = 0;
+  for (const k in cnt) if (cnt[k] > bestN) { best = +k; bestN = cnt[k]; }
+  return best ? TILE[best].color : cur.bg;
+}
+function drawTile(v, i, j) {
+  const t = TILE[v], x = i * T, y = j * T;
+  ctx.fillStyle = v === 3 ? treeGround(i, j) : (v === 9 || v === 10) ? emptyGround(i, j) : t.color;
+  ctx.fillRect(x, y, T, T);
+  if (v === 1) {
+    ctx.fillStyle = 'rgba(255,255,255,.15)'; ctx.fillRect(x + 3, y + 3, T - 6, 6);
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(x + 3, y + T - 8, T - 6, 5);
+  } else if (v === 2) {
+    ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.fillRect(x + 6, y + 10, T - 12, 3); ctx.fillRect(x + 10, y + 20, T - 20, 3);
+  } else if (v === 3) {
+    ctx.fillStyle = '#5a3a1e'; ctx.fillRect(x + T / 2 - 3, y + T * 0.55, 6, T * 0.4);
+    ctx.fillStyle = '#2e8b3a'; ctx.beginPath(); ctx.arc(x + T / 2, y + T * 0.42, T * 0.36, 0, Math.PI * 2); ctx.fill();
+  } else if (v === 7) {
+    ctx.strokeStyle = 'rgba(0,0,0,.4)'; ctx.lineWidth = 2;
+    ctx.strokeRect(x + 4, y + 4, T - 8, T - 8);
+    ctx.beginPath(); ctx.moveTo(x + 4, y + 4); ctx.lineTo(x + T - 4, y + T - 4);
+    ctx.moveTo(x + T - 4, y + 4); ctx.lineTo(x + 4, y + T - 4); ctx.stroke();
+  } else if (v === 6) {
+    ctx.fillStyle = 'rgba(0,0,0,.2)'; for (let k = 1; k < 4; k++) ctx.fillRect(x, y + k * T / 4, T, 2);
+  } else if (v === 4) {
+    ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(x + 8, y + 8, 4, 4); ctx.fillRect(x + 20, y + 18, 4, 4);
+  } else if (v === 10) {
+    // Titreyen alev: yükseklik zamanla değişir
+    const tt = performance.now() / 120;
+    for (let k = 0; k < 3; k++) {
+      const bx = x + 5 + k * 9, h = 13 + Math.sin(tt + k * 2) * 4;
+      ctx.fillStyle = '#ff7043';
+      ctx.beginPath(); ctx.moveTo(bx, y + T - 3); ctx.quadraticCurveTo(bx + 4.5, y + T - h, bx + 9, y + T - 3); ctx.fill();
+      ctx.fillStyle = '#ffeb3b';
+      ctx.beginPath(); ctx.moveTo(bx + 2.5, y + T - 3); ctx.quadraticCurveTo(bx + 4.5, y + T - h * 0.6, bx + 6.5, y + T - 3); ctx.fill();
+    }
+  } else if (v === 9) {
+    ctx.fillStyle = '#c9ced6';
+    for (let k = 0; k < 3; k++) {
+      const bx = x + 4 + k * 9;
+      ctx.beginPath(); ctx.moveTo(bx, y + T - 4); ctx.lineTo(bx + 4.5, y + 8); ctx.lineTo(bx + 9, y + T - 4); ctx.fill();
+    }
+  }
+}
+function drawBlock(x, y, color, label) {
+  const s = T * 0.7;
+  ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(x - s / 2 + 2, y - s / 2 + 3, s, s);
+  ctx.fillStyle = color; ctx.fillRect(x - s / 2, y - s / 2, s, s);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(x - s * 0.22, y - s * 0.14, s * 0.18, s * 0.18);
+  ctx.fillRect(x + s * 0.04, y - s * 0.14, s * 0.18, s * 0.18);
+  ctx.fillStyle = '#111';
+  ctx.fillRect(x - s * 0.18, y - s * 0.08, s * 0.08, s * 0.08);
+  ctx.fillRect(x + s * 0.08, y - s * 0.08, s * 0.08, s * 0.08);
+  if (label) text(label, x, y - s / 2 - 6);
+}
+// Oyuncu karakteri: yürüme animasyonu ve bakış yönüne göre gözler
+function drawPlayer(x, y) { drawHuman(x, y, PLAYER_COLOR, face, walkT); }
+// İnsan figürü: gömlek rengi, bakış yönü (fc) ve yürüme zamanı (walkTime, 0 ise durur)
+function drawHuman(x, y, shirt, fc, walkTime) {
+  const bob = Math.sin(walkTime * 14) * (walkTime > 0 ? 1.2 : 0);
+  const leg = Math.sin(walkTime * 14) * (walkTime > 0 ? 3 : 0);
+  ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(x, y + 13, 9, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#263238';
+  ctx.fillRect(x - 5, y + 5 + leg, 4, 7); ctx.fillRect(x + 1, y + 5 - leg, 4, 7);
+  ctx.fillStyle = '#2b7fb8';
+  ctx.fillRect(x - 10, y - 1 + bob, 3, 8); ctx.fillRect(x + 7, y - 1 + bob, 3, 8);
+  ctx.fillStyle = shirt;
+  ctx.fillRect(x - 7, y - 2 + bob, 14, 12);
+  ctx.fillStyle = '#ffd7b5';
+  ctx.beginPath(); ctx.arc(x, y - 9 + bob, 7, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#3b2a1a';
+  ctx.beginPath(); ctx.arc(x, y - 10 + bob, 7.5, Math.PI, 0); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(x - 2.5 + fc.x * 1.2, y - 8 + bob, 1.8, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + 2.5 + fc.x * 1.2, y - 8 + bob, 1.8, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#111';
+  ctx.beginPath(); ctx.arc(x - 2.5 + fc.x * 1.8, y - 8 + fc.y * 0.6 + bob, 0.9, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + 2.5 + fc.x * 1.8, y - 8 + fc.y * 0.6 + bob, 0.9, 0, Math.PI * 2); ctx.fill();
+}
+// NPC: insan figürü, gömlek rengi NPC rengi; oyun modunda oyuncuya döner
+function drawNpc(n) {
+  const p = mode === 'play' ? npcPos(n) : {x: n.x * T + T / 2, y: n.y * T + T / 2};
+  const x = p.x, y = p.y;
+  const g = mode === 'play' && nGoal[n.id] && !nGoal[n.id].failed ? nGoal[n.id] : null;
+  let fc = {x: 0, y: 1}, walk = 0;
+  if (g) {
+    const gx = g.x * T + T / 2 - x, gy = g.y * T + T / 2 - y, d = Math.hypot(gx, gy) || 1;
+    fc = {x: gx / d, y: gy / d}; walk = performance.now() / 1000;
+  } else if (mode === 'play') {
+    const dx = player.x - x, dy = player.y - y, d = Math.hypot(dx, dy) || 1;
+    fc = {x: dx / d, y: dy / d};
+  }
+  if (!walk && mode === 'play' && folRt[n.id] && folRt[n.id].path.length) walk = performance.now() / 1000;
+  drawHuman(x, y, n.color, fc, walk);
+  text(n.name, x, y - 22, '#ffe0b2');
+}
+// Yağmur nesnesi: sadece düzenleyicide bulut işareti olarak görünür
+function drawRainMarker(r) {
+  const x = r.x * T + T / 2, y = r.y * T + T / 2;
+  ctx.fillStyle = '#90caf9';
+  ctx.beginPath(); ctx.arc(x - 6, y - 4, 5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y - 7, 7, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + 6, y - 3, 5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillRect(x - 11, y - 4, 22, 6);
+  ctx.strokeStyle = '#90caf9'; ctx.lineWidth = 2;
+  for (const dx of [-6, 0, 6]) { ctx.beginPath(); ctx.moveTo(x + dx, y + 5); ctx.lineTo(x + dx - 2, y + 11); ctx.stroke(); }
+  text(r.cond ? 'Yağmur: ' + r.cond : 'Yağmur', x, y - 18, '#90caf9');
+}
+// Ateş nesnesi: koşul sağlanınca yanar (zarar verir), sağlanmazsa sönük kalır
+function fireActiveAt(i, j) {
+  return cur.fires.some(f => f.x === i && f.y === j && (!f.cond || condMet(f.cond)) && !state.out[f.id]);
+}
+// Yağmurda söner: yağmur yağarken geçen süre birikir, 20 saniye olunca ateş kalıcı olarak söner
+let wet = {};
+function updateFires(dt) {
+  if (!rainOn()) return;
+  for (const f of cur.fires) {
+    if (!f.rainOut || state.out[f.id]) continue;
+    wet[f.id] = (wet[f.id] || 0) + dt;
+    if (wet[f.id] >= 20) state.out[f.id] = true;
+  }
+}
+function drawFlameAt(x0, y0, on) {
+  const tt = performance.now() / 120;
+  for (let k = 0; k < 3; k++) {
+    const bx = x0 + 5 + k * 9, h = on ? 13 + Math.sin(tt + k * 2) * 4 : 4;
+    ctx.fillStyle = on ? '#ff7043' : '#4b4b4b';
+    ctx.beginPath(); ctx.moveTo(bx, y0 + T - 3); ctx.quadraticCurveTo(bx + 4.5, y0 + T - h, bx + 9, y0 + T - 3); ctx.fill();
+    if (on) {
+      ctx.fillStyle = '#ffeb3b';
+      ctx.beginPath(); ctx.moveTo(bx + 2.5, y0 + T - 3); ctx.quadraticCurveTo(bx + 4.5, y0 + T - h * 0.6, bx + 6.5, y0 + T - 3); ctx.fill();
+    }
+  }
+}
+function drawFireObj(f) {
+  const on = (!f.cond || condMet(f.cond)) && !state.out[f.id];
+  const x0 = f.x * T, y0 = f.y * T;
+  if (mode === 'edit') {
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(x0 + 2, y0 + 2, T - 4, T - 4);
+    drawFlameAt(x0, y0, true);
+    text(f.cond ? 'Ateş: ' + f.cond : 'Ateş', x0 + T / 2, y0 - 4, '#ffab91');
+  } else {
+    drawFlameAt(x0, y0, on);
+  }
+}
+// Oyunda: en az bir yağmur nesnesinin koşulu sağlanıyorsa yağmur
+let drops = [];
+function rainOn() { return cur.rains.some(r => !r.cond || condMet(r.cond)); }
+function drawRain() {
+  if (!rainOn()) return;
+  if (!drops.length) for (let k = 0; k < 110; k++) drops.push({x: Math.random() * cv.width, y: Math.random() * cv.height, s: 0.6 + Math.random() * 0.6});
+  ctx.strokeStyle = 'rgba(160,200,255,.45)'; ctx.lineWidth = 1.2 * dpr;
+  ctx.beginPath();
+  for (const d of drops) {
+    d.y += 14 * d.s * dpr; d.x -= 3 * d.s * dpr;
+    if (d.y > cv.height) { d.y = -10 * dpr; d.x = Math.random() * cv.width; }
+    if (d.x < -10 * dpr) d.x = cv.width;
+    ctx.moveTo(d.x, d.y); ctx.lineTo(d.x + 3 * dpr, d.y + 9 * dpr);
+  }
+  ctx.stroke();
+}
+// Düşman: kırmızımsı yuvarlak yaratık, can çubuğu üstte
+function drawEnemy(e) {
+  const p = mode === 'play' ? enemyPos(e) : {x: e.x * T + T / 2, y: e.y * T + T / 2};
+  const x = p.x, y = p.y;
+  if (e.boss) { ctx.save(); ctx.translate(x, y); ctx.scale(1.9, 1.9); ctx.translate(-x, -y); }
+  ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(x, y + 11, 9, 3, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = e.color; ctx.beginPath(); ctx.arc(x, y, 11, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(x - 4, y - 3, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + 4, y - 3, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#111';
+  ctx.beginPath(); ctx.arc(x - 4, y - 3, 1.4, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + 4, y - 3, 1.4, 0, Math.PI * 2); ctx.fill();
+  if (e.boss) {
+    // Boss görünümü: boynuzlar ve sarı parlayan kenar
+    ctx.fillStyle = '#3e2723';
+    ctx.beginPath(); ctx.moveTo(x - 9, y - 7); ctx.lineTo(x - 15, y - 20); ctx.lineTo(x - 3, y - 10); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + 9, y - 7); ctx.lineTo(x + 15, y - 20); ctx.lineTo(x + 3, y - 10); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,235,59,.85)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, 12.5, 0, Math.PI * 2); ctx.stroke();
+  }
+  if (mode === 'play') {
+    const frac = Math.max(0, enemyHp(e) / e.hp);
+    ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(x - 12, y - 18, 24, 4);
+    ctx.fillStyle = '#e53935'; ctx.fillRect(x - 12, y - 18, 24 * frac, 4);
+  } else text(e.name, x, y - 16, '#ff8a8a');
+  if (e.boss) text(mode === 'play' ? e.name : 'BOSS', x, y - 28, mode === 'play' ? '#ffab91' : '#ffeb3b');
+  if (e.boss) ctx.restore();
+}
+// Eşya görünümü: o.shape boşsa sarı daire (tür rengiyle), yoksa seçilen model
+function drawItemShape(o, x, y) {
+  const s = o.shape;
+  if (s === 'stick') {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(-Math.PI / 4);
+    ctx.fillStyle = '#8d5a2b'; ctx.fillRect(-3, -T * 0.28, 6, T * 0.56);
+    ctx.strokeStyle = '#4e2f14'; ctx.lineWidth = 1.5; ctx.strokeRect(-3, -T * 0.28, 6, T * 0.56);
+    ctx.restore();
+  } else if (s === 'sword') {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = '#cfd8dc'; ctx.fillRect(-2, -T * 0.32, 4, T * 0.4);
+    ctx.fillStyle = '#ffb300'; ctx.fillRect(-6, T * 0.08, 12, 3);
+    ctx.fillStyle = '#5d4037'; ctx.fillRect(-1.5, T * 0.11, 3, T * 0.18);
+    ctx.restore();
+  } else if (s === 'apple') {
+    ctx.fillStyle = '#e53935';
+    ctx.beginPath(); ctx.arc(x, y + 2, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#5d4037'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x, y - 6); ctx.lineTo(x + 1, y - 10); ctx.stroke();
+    ctx.fillStyle = '#43a047';
+    ctx.beginPath(); ctx.ellipse(x + 5, y - 8, 4, 2, -0.5, 0, Math.PI * 2); ctx.fill();
+  } else if (s === 'key') {
+    ctx.strokeStyle = '#ffd54f'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x - 6, y, 4.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#ffd54f';
+    ctx.fillRect(x - 2, y - 1.5, 12, 3);
+    ctx.fillRect(x + 6, y + 1, 2.5, 4);
+    ctx.fillRect(x + 9, y + 1, 2.5, 3);
+  } else if (s === 'ekmek') {
+    ctx.fillStyle = '#d7a05b'; ctx.beginPath(); ctx.ellipse(x, y, 11, 7, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x - 5, y - 3); ctx.lineTo(x + 5, y - 3); ctx.stroke();
+  } else if (s === 'balik') {
+    ctx.fillStyle = '#ff8a65'; ctx.beginPath(); ctx.ellipse(x - 2, y, 9, 5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + 5, y); ctx.lineTo(x + 12, y - 5); ctx.lineTo(x + 12, y + 5); ctx.fill();
+    ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(x - 6, y - 1, 1.3, 0, Math.PI * 2); ctx.fill();
+  } else if (s === 'et') {
+    ctx.fillStyle = '#c8553d'; ctx.beginPath(); ctx.ellipse(x - 2, y - 1, 8, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#f5f0e6'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x + 4, y); ctx.lineTo(x + 9, y + 5); ctx.stroke();
+    ctx.fillStyle = '#f5f0e6'; ctx.beginPath(); ctx.arc(x + 10, y + 6, 2.5, 0, Math.PI * 2); ctx.fill();
+  } else if (s === 'iksir') {
+    ctx.fillStyle = 'rgba(200,220,255,.75)'; ctx.fillRect(x - 3, y - 9, 6, 5);
+    ctx.beginPath(); ctx.arc(x, y + 3, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#e53935'; ctx.beginPath(); ctx.arc(x, y + 4, 5.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#8d6e63'; ctx.fillRect(x - 4, y - 12, 8, 3);
+  } else if (s === 'mantar') {
+    ctx.fillStyle = '#f5f0e6'; ctx.fillRect(x - 3, y, 6, 8);
+    ctx.fillStyle = '#e53935'; ctx.beginPath(); ctx.arc(x, y, 8, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(x - 3, y - 3, 1.6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + 3, y - 4, 1.6, 0, Math.PI * 2); ctx.fill();
+  } else if (s === 'balta') {
+    ctx.strokeStyle = '#8d5a2b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - 2, y + 11); ctx.lineTo(x + 4, y - 9); ctx.stroke();
+    ctx.fillStyle = '#90a4ae'; ctx.beginPath(); ctx.moveTo(x + 4, y - 10); ctx.lineTo(x + 12, y - 6); ctx.lineTo(x + 10, y - 1); ctx.lineTo(x + 3, y - 3); ctx.fill();
+  } else if (s === 'mizrak') {
+    ctx.strokeStyle = '#8d5a2b'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(x - 8, y + 9); ctx.lineTo(x + 6, y - 6); ctx.stroke();
+    ctx.fillStyle = '#cfd8dc'; ctx.beginPath(); ctx.moveTo(x + 6, y - 9); ctx.lineTo(x + 10, y - 4); ctx.lineTo(x + 5, y - 4); ctx.fill();
+  } else if (s === 'kalkan') {
+    ctx.fillStyle = '#1e88e5'; ctx.beginPath();
+    ctx.moveTo(x, y - 10); ctx.lineTo(x + 9, y - 6); ctx.lineTo(x + 8, y + 2);
+    ctx.quadraticCurveTo(x + 5, y + 9, x, y + 11); ctx.quadraticCurveTo(x - 5, y + 9, x - 8, y + 2);
+    ctx.lineTo(x - 9, y - 6); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#ffd54f'; ctx.lineWidth = 2; ctx.stroke();
+  } else if (s === 'kristal') {
+    ctx.fillStyle = '#ab47bc'; ctx.beginPath(); ctx.moveTo(x, y - 10); ctx.lineTo(x + 7, y); ctx.lineTo(x, y + 10); ctx.lineTo(x - 7, y); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.beginPath(); ctx.moveTo(x, y - 10); ctx.lineTo(x + 3, y - 2); ctx.lineTo(x - 2, y - 2); ctx.closePath(); ctx.fill();
+  } else if (s === 'altin') {
+    ctx.fillStyle = '#ffd700'; ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#b8860b'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.stroke();
+  } else if (s === 'kitap') {
+    ctx.fillStyle = '#c62828'; ctx.fillRect(x - 8, y - 9, 16, 18);
+    ctx.fillStyle = '#fff3e0'; ctx.fillRect(x - 6, y - 7, 12, 14);
+    ctx.strokeStyle = '#8a8a8a'; ctx.lineWidth = 1; ctx.beginPath();
+    for (let k = -4; k <= 4; k += 2) { ctx.moveTo(x - 4, y + k); ctx.lineTo(x + 4, y + k); }
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = o.kind === 'food' ? '#8bc34a' : o.kind === 'weapon' ? '#cfd8dc' : o.kind === 'drink' ? '#4fc3f7' : '#ffd700';
+    ctx.beginPath(); ctx.arc(x, y, T * 0.22, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#8a6d00'; ctx.lineWidth = 2; ctx.stroke();
+  }
+}
+function drawItem(o) {
+  const x = o.x * T + T / 2, y = o.y * T + T / 2;
+  drawItemShape(o, x, y);
+  if (mode === 'edit') text(o.name + (o.n > 1 ? ' ×' + o.n : ''), x, y - T * 0.3, '#ffe082');
+}
+function drawSign(o) {
+  const x = o.x * T + T / 2, y = o.y * T + T / 2;
+  ctx.fillStyle = '#6d4c2b'; ctx.fillRect(x - 2, y, 4, T * 0.35);
+  ctx.fillStyle = '#c8a165'; ctx.fillRect(x - T * 0.3, y - T * 0.3, T * 0.6, T * 0.3);
+  ctx.strokeStyle = '#6d4c2b'; ctx.lineWidth = 1.5; ctx.strokeRect(x - T * 0.3, y - T * 0.3, T * 0.6, T * 0.3);
+  if (mode === 'edit') text('Tabela', x, y - T * 0.35, '#e0c48a');
+}
+function draw() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#0d1117'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.setTransform(dpr * zoom, 0, 0, dpr * zoom, dpr * (W / 2 - cam.x * zoom), dpr * (H / 2 - cam.y * zoom));
+  const SW = cur.w * T, SH = cur.h * T;
+  ctx.fillStyle = cur.bg; ctx.fillRect(0, 0, SW, SH);
+  for (let j = 0; j < cur.h; j++) for (let i = 0; i < cur.w; i++) {
+    const v = cur.tiles[j * cur.w + i];
+    if (v && TILE[v]) drawTile(v, i, j);
+    else if (!v && hasObjAt(i, j)) { ctx.fillStyle = emptyGround(i, j); ctx.fillRect(i * T, j * T, T, T); }
+  }
+  for (const e of cur.exits) {
+    const locked = e.lock && (mode === 'edit' || !state.unlocked[e.id]);
+    ctx.fillStyle = locked ? 'rgba(170,95,20,.75)' : 'rgba(255,213,79,.45)';
+    ctx.fillRect(e.x * T + 4, e.y * T + 4, T - 8, T - 8);
+    if (locked) drawPadlock(e.x * T + T / 2, e.y * T + T / 2);
+    if (mode === 'edit') text('→ ' + (P.scenes[e.to] ? P.scenes[e.to].name : '?') + (e.lock ? ' (kilitli)' : ''), e.x * T + T / 2, e.y * T - 4, '#ffd54f');
+  }
+  for (const s of cur.signs) drawSign(s);
+  for (const o of cur.items) { if (mode === 'play' && state.picked[o.id]) continue; drawItem(o); }
+  for (const n of (mode === 'play' ? sceneNpcs() : cur.npcs)) drawNpc(n);
+  for (const en of cur.enemies) if (mode === 'edit' || enemyAlive(en)) drawEnemy(en);
+  if (mode === 'edit') for (const r of cur.rains) drawRainMarker(r);
+  for (const f of cur.fires) drawFireObj(f);
+  for (const b of cur.benches) drawBench(b);
+
+  if (mode === 'edit') {
+    ctx.strokeStyle = 'rgba(255,255,255,.1)'; ctx.lineWidth = 1 / zoom;
+    ctx.beginPath();
+    for (let i = 0; i <= cur.w; i++) { ctx.moveTo(i * T, 0); ctx.lineTo(i * T, SH); }
+    for (let j = 0; j <= cur.h; j++) { ctx.moveTo(0, j * T); ctx.lineTo(SW, j * T); }
+    ctx.stroke();
+    const sp = cur.spawn;
+    ctx.fillStyle = 'rgba(120,255,160,.35)'; ctx.fillRect(sp.x * T + 4, sp.y * T + 4, T - 8, T - 8);
+    text('S', sp.x * T + T / 2, sp.y * T + T / 2 + 4, '#9cffb8');
+    if (sel) {
+      ctx.strokeStyle = '#58a6ff'; ctx.lineWidth = 2 / zoom;
+      ctx.strokeRect(sel.ref.x * T + 1, sel.ref.y * T + 1, T - 2, T - 2);
+    }
+  } else {
+    drawPlayer(player.x, player.y);
+    text('Sen', player.x, player.y - 22, '#79c0ff');
+  }
+  if (mode === 'play') {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    drawRain();
+    if (hitFlash > 0) { ctx.fillStyle = `rgba(255,40,40,${hitFlash * 0.9})`; ctx.fillRect(0, 0, cv.width, cv.height); }
+    const bw = 170 * dpr, bh = 14 * dpr, bx = 12 * dpr, by = 54 * dpr;
+    ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(bx, by, bw, bh);
+    ctx.fillStyle = state.hp > PMAX * 0.3 ? '#4caf50' : '#e53935';
+    ctx.fillRect(bx, by, bw * state.hp / PMAX, bh);
+    ctx.fillStyle = '#fff'; ctx.font = `${11 * dpr}px system-ui`; ctx.textAlign = 'left';
+    ctx.fillText(`Can ${state.hp}/${PMAX}`, bx + 6 * dpr, by + bh - 3 * dpr);
+    const drawBar = (yy, val, col, label) => {
+      ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(bx, yy, bw, bh);
+      ctx.fillStyle = col; ctx.fillRect(bx, yy, bw * val / PMAX, bh);
+      ctx.fillStyle = '#fff'; ctx.fillText(`${label} ${Math.round(val)}`, bx + 6 * dpr, yy + bh - 3 * dpr);
+    };
+    drawBar(by + (bh + 4 * dpr), state.hunger, '#ff9800', 'Açlık');
+    drawBar(by + 2 * (bh + 4 * dpr), state.thirst, '#29b6f6', 'Susuzluk');
+  }
+  if (fade > 0) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = `rgba(0,0,0,${fade})`; ctx.fillRect(0, 0, cv.width, cv.height);
+  }
+}
+
+/* ---------- döngü ---------- */
+function update(dt) {
+  if (fadeDir === 1) {
+    fade = Math.min(1, fade + dt * 2.5);
+    if (fade >= 1) {
+      fadeDir = -1;
+      if (pending) {
+        // Sahne değişirken açık kalmış diyalog/mağaza penceresi varsa kapat
+        closeDlg(); if ($('modal').classList.contains('show')) closeModal();
+        moveFollowers(pending.id, pending.sp);
+        loadScene(pending.id, pending.sp); toast(cur.name); pending = null;
+      }
+    }
+  } else if (fadeDir === -1) {
+    fade = Math.max(0, fade - dt * 2.5);
+    if (fade <= 0) fadeDir = 0;
+  }
+  if (mode === 'play') {
+    if (exitCool > 0) exitCool -= dt;
+    if (dashCool > 0) dashCool -= dt;
+    if (pHurtCool > 0) pHurtCool -= dt;
+    if (atkCool > 0) atkCool -= dt;
+    if (hitFlash > 0) hitFlash -= dt;
+    let isMoving = false;
+    if (!uiBusy() && fadeDir === 0) {
+      if (dashReq && dashCool <= 0) { dash = 0.2; dashCool = 0.8; }
+      if (dash > 0) {
+        dash -= dt; isMoving = true;
+        moveBy(face.x, face.y, 560 * dt);
+      } else {
+        const v = inputVec();
+        if (v.x || v.y) {
+          const m = Math.hypot(v.x, v.y);
+          face = {x: v.x / m, y: v.y / m};
+          walkT += dt; isMoving = true;
+          moveBy(v.x, v.y, 125 * dt);
+        }
+      }
+      if (exitCool <= 0) {
+        const tx = Math.floor(player.x / T), ty = Math.floor(player.y / T);
+        const ex = cur.exits.find(e => e.x === tx && e.y === ty);
+        if (ex && P.scenes[ex.to]) changeScene(ex.to, null);
+      }
+      const ptx = Math.floor(player.x / T), pty = Math.floor(player.y / T);
+      const tv = ptx >= 0 && pty >= 0 && ptx < cur.w && pty < cur.h ? cur.tiles[pty * cur.w + ptx] : 0;
+      if (TILE[tv] && TILE[tv].hurt) hurt(TILE[tv].hurt);
+      if (fireActiveAt(ptx, pty)) hurt(10);
+      updateEnemies(dt);
+      updateFires(dt);
+      updateNeeds(dt, isMoving);
+      tryUnlocks();
+      if (interactReq) {
+        // Elinde silah varsa ve yakında düşman varsa X vurur, yoksa normal etkileşim (eşya, tabela, NPC)
+        const held = state.slots[state.hb];
+        if (held && held.kind === 'weapon' && nearestEnemy(1.8 * T)) useSlot(state.hb);
+        else interact();
+      }
+      if (actionReq) { const n = nearNpc(); if (n) openDialog(n); }
+    }
+    updateNpcs(dt);
+    updateFollowers(dt);
+    btnA.classList.toggle('hot', !uiBusy() && !!nearNpc());
+    $('btnX').classList.toggle('hot', !uiBusy() && !!nearestInteractable());
+  }
+  actionReq = false; interactReq = false; dashReq = false;
+}
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  update(dt); updateCam(); draw();
+  requestAnimationFrame(frame);
+}
+
+/* ---------- yardımcılar ---------- */
+function el(tag, attrs, kids) {
+  const e = document.createElement(tag);
+  attrs = attrs || {};
+  for (const k in attrs) {
+    if (k === 'on') for (const ev in attrs.on) e.addEventListener(ev, attrs.on[ev]);
+    else if (k in e) e[k] = attrs[k];
+    else e.setAttribute(k, attrs[k]);
+  }
+  for (const c of kids || []) e.append(c);
+  return e;
+}
+function row(label, ...kids) {
+  return el('div', {className: 'row'}, [el('span', {textContent: label}), ...kids]);
+}
+function inp(type, val, fn, evt) {
+  return el('input', {type, value: val, on: {[evt || 'input']: e => fn(type === 'number' ? Number(e.target.value) : e.target.value)}});
+}
+function btn(label, cls, fn) { return el('button', {textContent: label, className: cls || '', on: {click: fn}}); }
+function sceneSelect(v, fn) {
+  const s = el('select', {on: {change: e => fn(e.target.value)}});
+  for (const id in P.scenes) s.append(el('option', {value: id, textContent: P.scenes[id].name}));
+  s.value = v; return s;
+}
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 1600);
+}
+function download(name, txt, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([txt], {type})); a.download = name;
+  document.body.append(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+function exportHTML() {
+  const data = JSON.stringify(P).replace(/</g, '\\u003c');
+  let html = document.documentElement.outerHTML;
+  html = html.replace('/*EMBED*/' + 'null', '/*EMBED*/' + data)
+             .replace(/<body[^>]*>/, '<body class="embedded mode-play">');
+  return '<!doctype html>\n' + html;
+}
+
+/* ---------- modal ---------- */
+function openModal(title, nodes, onClose) {
+  $('mtitle').textContent = title;
+  const b = $('mbody'); b.innerHTML = ''; b.append(...nodes);
+  $('modal').classList.add('show');
+  modalClose = onClose || null;
+}
+function closeModal() {
+  $('modal').classList.remove('show');
+  const f = modalClose; modalClose = null;
+  sel = null; deleteArmed = false;
+  if (f) f();
+}
+function npcModal(n) {
+  const ms = el('textarea', {value: n.shopRaw || '', on: {input: e => { n.shopRaw = e.target.value; changed(); }}});
+  const ta = el('textarea', {value: n.text, on: {input: e => { n.text = e.target.value; changed(); }}});
+  openModal('NPC: ' + n.name, [
+    row('İsim', inp('text', n.name, v => { n.name = v; changed(); })),
+    row('Renk', inp('color', n.color, v => { n.color = v; changed(); })),
+    row('Hareket', inp('text', n.moveTo ? '@git ' + n.moveTo.x + ',' + n.moveTo.y : '', v => {
+      const m = v.match(/@git\s*(\d+)\s*,\s*(\d+)/i);
+      if (m) n.moveTo = {x: +m[1], y: +m[2]}; else delete n.moveTo;
+      changed();
+    })),
+    row('Takip koşulu', inp('text', n.followCond || '', v => { if (v.trim()) n.followCond = v.trim(); else delete n.followCond; changed(); })),
+    el('div', {className: 'hint', textContent: 'Takip koşulu: takip açıkken bu koşul sağlanmazsa NPC durur, sağlanınca yeniden takip eder. Boş = koşulsuz. Görev bitince bırakmak için "görev aktif: Ad" yaz.'}),
+    el('div', {className: 'hint', textContent: 'Hareket:"@git x,y" yazarsan diyalog açılana kadar başlangıç ile bu kare arasında gidip gelir. Boş bırakırsan durur.'}),
+    el('div', {className: 'hint', textContent:
+      'Her satır bir diyalog. Seçenekli soru: ? Cümle | (seçenek1) => cevap | (seçenek2) => cevap. Komutlar: @görev başla: Ad | @görev bitir: Ad | @eşya ver: Ad 2 | @eşya al: Ad | @git x,y | @mağaza | @hedef: Görev | Eşya 5. Koşul: {görev bitti: Ad} Metin (ayrıca görev aktif / görev yok / eşya: Ad 3)'}),
+    ta,
+    el('div', {className: 'hint', textContent: 'Mağaza: her satır bir eşya, biçim: Ad | alış | satış | tür. Tür: "yemek 10" (can doldurur) ya da "silah 20" (hasar verir), boş bırakılırsa normal. Diyalogda @mağaza yazınca diyalog bitince açılır.'}),
+    ms,
+    row('', btn('NPC sil', 'danger', () => { removeObjAt(n.x, n.y); closeModal(); changed(); }))
+  ]);
+}
+function exitModal(e) {
+  const kindSel = el('select', {on: {change: ev => {
+    const k = ev.target.value;
+    if (k === 'none') delete e.lock;
+    else e.lock = {kind: k, name: k === 'item' ? 'Altın' : 'Kuzeydeki hazine', n: 1, consume: k === 'item'};
+    changed(); exitModal(e);
+  }}});
+  for (const [v, l] of [['none', 'Kilit yok'], ['item', 'Eşya ile kilit'], ['quest', 'Görev ile kilit']]) {
+    kindSel.append(el('option', {value: v, textContent: l}));
+  }
+  kindSel.value = e.lock ? e.lock.kind : 'none';
+  const nodes = [
+    row('Hedef sahne', sceneSelect(e.to, v => { e.to = v; changed(); })),
+    el('div', {className: 'hint', textContent: 'Karakter hedef sahnenin Başlangıç bloğunda çıkar.'}),
+    row('Kilit', kindSel)
+  ];
+  if (e.lock) {
+    nodes.push(row(e.lock.kind === 'item' ? 'Eşya adı' : 'Görev adı',
+      inp('text', e.lock.name, v => { e.lock.name = v; changed(); })));
+    if (e.lock.kind === 'item') {
+      nodes.push(row('Adet', inp('number', e.lock.n, v => { e.lock.n = Math.max(1, v | 0); changed(); }, 'change')));
+      nodes.push(row('', el('label', {}, [
+        el('input', {type: 'checkbox', checked: !!e.lock.consume, on: {change: ev => { e.lock.consume = ev.target.checked; changed(); }}}),
+        el('span', {textContent: ' Eşyayı kapıda harca (sil)'})
+      ])));
+    }
+    nodes.push(el('div', {className: 'hint', textContent: e.lock.kind === 'item'
+      ? 'Oyuncu kapıya yaklaşınca eşya yeterliyse kapı açılır. Harcama açıksa eşyalar envanterden silinir.'
+      : 'Oyuncu kapıya yaklaşınca görev bitmişse kapı açılır.'}));
+  }
+  nodes.push(row('', btn('Çıkış sil', 'danger', () => { removeObjAt(e.x, e.y); closeModal(); changed(); })));
+  openModal('Çıkış', nodes);
+}
+function enemyModal(e) {
+  openModal('Düşman: ' + e.name, [
+    row('İsim', inp('text', e.name, v => { e.name = v; changed(); })),
+    row('Can', inp('number', e.hp, v => { e.hp = Math.max(1, v | 0); changed(); }, 'change')),
+    row('Hasar', inp('number', e.dmg, v => { e.dmg = Math.max(0, v | 0); changed(); }, 'change')),
+    row('Renk', inp('color', e.color, v => { e.color = v; changed(); })),
+    row('Boss', el('label', {}, [
+      el('input', {type: 'checkbox', checked: !!e.boss, on: {change: ev => {
+        e.boss = ev.target.checked;
+        if (e.boss) { e.hp = Math.max(e.hp, 150); e.dmg = Math.max(e.dmg, 20); }
+        changed(); enemyModal(e);
+      }}}),
+      el('span', {textContent: ' Boss (büyük, güçlü)'})
+    ])),
+    el('div', {className: 'hint', textContent: 'Düşman yakına gelince oyuncuya doğru gelir ve temas ettiğinde hasar verir. Silah eşyasıyla vurulur (hotbar slotuna iki kez dokun ya da Q). Can sıfırlanınca yenilir ve bu kayıtta kalır.'}),
+    row('', btn('Düşman sil', 'danger', () => { removeObjAt(e.x, e.y); closeModal(); changed(); }))
+  ]);
+}
+function itemModal(o) {
+  const ks = el('select', {on: {change: ev => {
+    o.kind = ev.target.value;
+    if (o.kind === 'normal') { delete o.kind; delete o.val; } else o.val = o.val || 10;
+    changed(); itemModal(o);
+  }}});
+  for (const [v, l] of [['normal', 'Normal'], ['food', 'Yemek (açlık giderir)'], ['drink', 'İçecek (susuzluk giderir)'], ['weapon', 'Silah (hasar verir)']]) {
+    ks.append(el('option', {value: v, textContent: l}));
+  }
+  ks.value = o.kind || 'normal';
+  const extra = o.kind && o.kind !== 'normal'
+    ? [row(o.kind === 'weapon' ? 'Hasar' : o.kind === 'drink' ? 'Susuzluk' : 'Açlık', inp('number', o.val || 10, v => { o.val = Math.max(1, v | 0); changed(); }, 'change'))]
+    : [];
+  openModal('Eşya', [
+    row('Ad', inp('text', o.name, v => { o.name = v; changed(); })),
+    row('Tür', ks),
+    row('Görünüm', (() => {
+      const sh = el('select', {on: {change: ev => { if (ev.target.value) o.shape = ev.target.value; else delete o.shape; changed(); }}});
+      for (const [v, l] of [['', 'Daire (varsayılan)'], ['stick', 'Çubuk'], ['sword', 'Kılıç'], ['apple', 'Elma'], ['key', 'Anahtar'], ['ekmek', 'Ekmek'], ['balik', 'Balık'], ['et', 'Et (but)'], ['iksir', 'İksir şişesi'], ['mantar', 'Mantar'], ['balta', 'Balta'], ['mizrak', 'Mızrak'], ['kalkan', 'Kalkan'], ['kristal', 'Kristal'], ['altin', 'Altın para'], ['kitap', 'Kitap']]) {
+        sh.append(el('option', {value: v, textContent: l}));
+      }
+      sh.value = o.shape || '';
+      return sh;
+    })()),
+    ...extra,
+    row('Adet', inp('number', o.n, v => { o.n = Math.max(1, v | 0); changed(); }, 'change')),
+    el('div', {className: 'hint', textContent: 'Oyuncu eşyanın üstündeyken X ile alır. Alınan eşya bir daha çıkmaz.'}),
+    row('Alınınca görev başlat', inp('text', (o.onPick && o.onPick.start) || '', v => {
+      o.onPick = o.onPick || {}; o.onPick.start = v.trim() || undefined;
+      if (!o.onPick.start && !o.onPick.finish) delete o.onPick;
+      changed();
+    })),
+    row('Alınınca görev bitir', inp('text', (o.onPick && o.onPick.finish) || '', v => {
+      o.onPick = o.onPick || {}; o.onPick.finish = v.trim() || undefined;
+      if (!o.onPick.start && !o.onPick.finish) delete o.onPick;
+      changed();
+    })),
+    el('div', {className: 'hint', textContent: 'Boş bırakılabilir. Bitirilecek görev daha önce başlatılmış olmalı (ya da aynı anda başlatılıyorsa önce başlar).'}),
+    row('', btn('Eşya sil', 'danger', () => { removeObjAt(o.x, o.y); closeModal(); changed(); }))
+  ]);
+}
+function signModal(s) {
+  const ta = el('textarea', {value: s.text, on: {input: e => { s.text = e.target.value; changed(); }}});
+  openModal('Tabela', [
+    el('div', {className: 'hint', textContent: 'Tabelanın metni. Oyunda X ile okunur, diyalog gibi satır satır yazılabilir.'}),
+    ta,
+    row('', btn('Tabela sil', 'danger', () => { removeObjAt(s.x, s.y); closeModal(); changed(); }))
+  ]);
+}
+function sceneModal() {
+  const s = cur;
+  openModal('Sahne: ' + s.name, [
+    row('Ad', inp('text', s.name, v => { s.name = v; refreshSceneSel(); changed(); })),
+    row('Boyut', inp('number', s.w, v => { resizeScene(s, Math.max(4, v | 0), s.h); changed(); }, 'change'),
+                 el('span', {textContent: '×'}),
+                 inp('number', s.h, v => { resizeScene(s, s.w, Math.max(4, v | 0)); changed(); }, 'change')),
+    row('Arka plan', inp('color', s.bg, v => { s.bg = v; changed(); })),
+    row('Başlangıç sahnesi', sceneSelect(P.start, v => { P.start = v; refreshSceneSel(); changed(); })),
+    row('', btn('Bu sahneyi sil', 'danger', deleteScene))
+  ]);
+}
+function rainModal(r) {
+  openModal('Yağmur', [
+    row('Koşul', inp('text', r.cond || '', v => { r.cond = v.trim(); changed(); })),
+    el('div', {className: 'hint', textContent: 'Boş bırakırsan sahnede hep yağmur olur. Örnekler: "görev aktif: Ad" (görev başlayınca yağar), "görev bitti: Ad" (bitince yağar), "görev var: Ad" (başladıktan sonra hep yağar), "görev yok: Ad" (başlamadan önce yağar). Birden fazla yağmur nesnesi varsa biri sağlanınca yağar.'}),
+    row('', btn('Yağmur sil', 'danger', () => { removeObjAt(r.x, r.y); closeModal(); changed(); }))
+  ]);
+}
+function fireModal(f) {
+  openModal('Ateş', [
+    row('Koşul', inp('text', f.cond || '', v => { f.cond = v.trim(); changed(); })),
+    row('Yağmur', el('label', {}, [
+      el('input', {type: 'checkbox', checked: !!f.rainOut, on: {change: ev => { f.rainOut = ev.target.checked; changed(); }}}),
+      el('span', {textContent: ' Yağmurda 20 saniyede söner'})
+    ])),
+    el('div', {className: 'hint', textContent: 'Boş bırakırsan ateş hep yanar. Koşul sağlanmazsa ateş sönük kalır ve zarar vermez. Örnekler: "görev aktif: Ad", "görev bitti: Ad", "eşya: Odun 2".'}),
+    row('', btn('Ateş sil', 'danger', () => { removeObjAt(f.x, f.y); closeModal(); changed(); }))
+  ]);
+}
+// Tarifler: "Sonuç | Malzeme adet, Malzeme adet | (isteğe bağlı) yemek 10 / silah 20"
+// "yemek" / "içecek" / "silah" kelimesini eşya türüne çevirir
+function kindWord(w) {
+  const k = w.toLowerCase();
+  return k === 'yemek' ? 'food' : k === 'içecek' ? 'drink' : 'weapon';
+}
+function parseRecipes() {
+  return (P.recipesRaw || '').split('\n').map(l => l.split('|').map(s => s.trim())).filter(p => p[0] && p[1]).map(p => {
+    const need = p[1].split(',').map(s => {
+      const m = s.trim().match(/^(.*?)\s*(?::\s*|\s+)(\d+)$/);
+      return m ? {name: m[1].trim(), n: +m[2]} : {name: s.trim(), n: 1};
+    });
+    const t = (p[2] || '').match(/^(yemek|silah|içecek)\s*(\d+)?$/i);
+    return {name: p[0], need, kind: t ? kindWord(t[1]) : null, val: t && t[2] ? +t[2] : 10};
+  });
+}
+function recipeModal() {
+  const ta = el('textarea', {value: P.recipesRaw, on: {input: e => { P.recipesRaw = e.target.value; changed(); }}});
+  openModal('Tarifler', [
+    el('div', {className: 'hint', textContent: 'Her satır bir tarif. Biçim: Sonuç | Malzeme adet, Malzeme adet | (isteğe bağlı) yemek 10, içecek 20 veya silah 20. Örnekler: Ekmek | Un 2, Su 1 | yemek 15 · Limonata | Su 1, Şeker 1 | içecek 30'}),
+    ta
+  ]);
+}
+// Tezgâh: malzemeleri envanterde olan tarifler üretilir
+function openCraft() {
+  const list = parseRecipes();
+  if (!list.length) return toast('Tarif yok (üst menüden 📖 Tarifler ile ekle)');
+  const nodes = [el('div', {className: 'hint', textContent: 'Malzemeler envanterde varsa üretilebilir (mavi olanlar).'})];
+  for (const r of list) {
+    const ok = r.need.every(m => countItem(m.name) >= m.n);
+    const label = r.name + ' — ' + r.need.map(m => m.name + ' ' + m.n).join(', ');
+    nodes.push(row('', btn(label, ok ? 'on' : '', () => {
+      if (!ok) return toast('Malzeme eksik');
+      if (!fits(r.name, 1)) return toast('Envanter dolu');
+      for (const m of r.need) removeItem(m.name, m.n);
+      addItem(r.name, 1, r.kind, r.val);
+      toast(r.name + ' üretildi');
+      openCraft();
+    })));
+  }
+  openModal('Tezgâh', nodes);
+}
+function benchModal(b) {
+  openModal('Tezgâh', [
+    el('div', {className: 'hint', textContent: 'Oyunda tezgâhın yanında X ile üretim yapılır. Tarifler üst menüdeki 📖 Tarifler bölümünde.'}),
+    row('', btn('Tezgâh sil', 'danger', () => { removeObjAt(b.x, b.y); closeModal(); changed(); }))
+  ]);
+}
+function drawBench(b) {
+  const x0 = b.x * T, y0 = b.y * T;
+  ctx.fillStyle = '#6d4c2b'; ctx.fillRect(x0 + 3, y0 + 12, T - 6, 10);
+  ctx.fillStyle = '#4e3520'; ctx.fillRect(x0 + 5, y0 + 22, 4, 8); ctx.fillRect(x0 + T - 9, y0 + 22, 4, 8);
+  ctx.fillStyle = '#9e9e9e'; ctx.fillRect(x0 + 8, y0 + 8, 7, 4);
+  ctx.fillStyle = '#c8a165'; ctx.fillRect(x0 + 18, y0 + 8, 8, 4);
+  if (mode === 'edit') text('Tezgâh', x0 + T / 2, y0 - 4, '#e0c48a');
+}
+function openObj(o) {
+  sel = o;
+  if (o.type === 'npc') npcModal(o.ref);
+  else if (o.type === 'exit') exitModal(o.ref);
+  else if (o.type === 'item') itemModal(o.ref);
+  else if (o.type === 'enemy') enemyModal(o.ref);
+  else if (o.type === 'rain') rainModal(o.ref);
+  else if (o.type === 'fire') fireModal(o.ref);
+  else if (o.type === 'bench') benchModal(o.ref);
+  else signModal(o.ref);
+}
+
+/* ---------- editör ---------- */
+function buildPalette() {
+  const box = $('palette'); box.innerHTML = '';
+  for (const p of PAL) {
+    let label = p.label, color = p.color || null;
+    if (p.k.startsWith('tile:')) { const t = TILE[+p.k.slice(5)]; label = t.name; color = t.color; }
+    const sw = el('span', {className: 'sw'});
+    sw.style.background = color || '#30363d';
+    box.append(el('button', {className: tool === p.k ? 'on' : '', on: {click: () => { tool = p.k; buildPalette(); }}},
+      [sw, el('span', {textContent: label})]));
+  }
+}
+function refreshSceneSel() {
+  const s = $('sceneSel'); s.innerHTML = '';
+  for (const id in P.scenes) {
+    s.append(el('option', {value: id, textContent: P.scenes[id].name + (id === P.start ? ' ★' : '')}));
+  }
+  s.value = curId;
+}
+function lists() { return {npc: cur.npcs, exit: cur.exits, item: cur.items, sign: cur.signs, enemy: cur.enemies, rain: cur.rains, fire: cur.fires, bench: cur.benches}; }
+function objAt(i, j) {
+  const L = lists();
+  for (const type of ['npc', 'exit', 'item', 'sign', 'enemy', 'rain', 'fire', 'bench']) {
+    const ref = L[type].find(o => o.x === i && o.y === j);
+    if (ref) return {type, ref};
+  }
+  return null;
+}
+function removeObjAt(i, j) {
+  const o = objAt(i, j); if (!o) return;
+  const arr = lists()[o.type];
+  arr.splice(arr.indexOf(o.ref), 1);
+  if (sel && sel.ref === o.ref) sel = null;
+}
+function applyTool(i, j, first) {
+  const idx = j * cur.w + i;
+  if (tool === 'erase') { cur.tiles[idx] = 0; removeObjAt(i, j); }
+  else if (tool.startsWith('tile:')) { if (!objAt(i, j)) cur.tiles[idx] = +tool.slice(5); }
+  else if (tool === 'spawn') { cur.spawn = {x: i, y: j}; }
+  else if (tool === 'select') { if (first) { const o = objAt(i, j); if (o) openObj(o); } }
+  else if (first && (tool === 'npc' || tool === 'exit' || tool === 'item' || tool === 'sign' || tool === 'enemy' || tool === 'rain' || tool === 'fire' || tool === 'bench')) {
+    const o = objAt(i, j);
+    if (o) openObj(o);
+    else {
+      cur.tiles[idx] = 0;
+      if (tool === 'npc') {
+        const n = {id: newId(), x: i, y: j, name: 'NPC', color: '#ffb74d', text: 'Merhaba!'};
+        cur.npcs.push(n); openObj({type: 'npc', ref: n});
+      } else if (tool === 'exit') {
+        const to = Object.keys(P.scenes).find(x => x !== curId) || curId;
+        const ex = {id: newId(), x: i, y: j, to};
+        cur.exits.push(ex); openObj({type: 'exit', ref: ex});
+      } else if (tool === 'item') {
+        const it = {id: newId(), x: i, y: j, name: 'Altın', n: 1};
+        cur.items.push(it); openObj({type: 'item', ref: it});
+      } else if (tool === 'bench') {
+        const b = {x: i, y: j};
+        cur.benches.push(b); openObj({type: 'bench', ref: b});
+      } else if (tool === 'fire') {
+        const f = {id: newId(), x: i, y: j, cond: ''};
+        cur.fires.push(f); openObj({type: 'fire', ref: f});
+      } else if (tool === 'rain') {
+        const r = {x: i, y: j, cond: ''};
+        cur.rains.push(r); openObj({type: 'rain', ref: r});
+      } else if (tool === 'enemy') {
+        const en = {id: newId(), x: i, y: j, name: 'Düşman', hp: 30, dmg: 10, color: '#e35d5d'};
+        cur.enemies.push(en); openObj({type: 'enemy', ref: en});
+      } else {
+        const sg = {x: i, y: j, text: 'Buraya bir şey yaz.'};
+        cur.signs.push(sg); openObj({type: 'sign', ref: sg});
+      }
+    }
+  }
+  changed();
+}
+function resizeScene(s, w, h) {
+  const old = s.tiles, ow = s.w, oh = s.h;
+  const t = new Array(w * h).fill(0);
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+    if (i < ow && j < oh) t[j * w + i] = old[j * ow + i];
+    else if (i === 0 || j === 0 || i === w - 1 || j === h - 1) t[j * w + i] = 1;
+  }
+  s.tiles = t; s.w = w; s.h = h;
+  const inside = o => o.x < w && o.y < h;
+  s.npcs = s.npcs.filter(inside); s.exits = s.exits.filter(inside);
+  s.items = s.items.filter(inside); s.signs = s.signs.filter(inside); s.enemies = s.enemies.filter(inside); s.rains = s.rains.filter(inside); s.fires = s.fires.filter(inside); s.benches = s.benches.filter(inside);
+  s.spawn.x = Math.min(s.spawn.x, w - 1); s.spawn.y = Math.min(s.spawn.y, h - 1);
+}
+// confirm() da engellenebildiği için: ilk basışta uyarı, ikinci basışta silme
+let deleteArmed = false;
+function deleteScene() {
+  if (Object.keys(P.scenes).length < 2) return toast('En az bir sahne kalmalı');
+  if (!deleteArmed) { deleteArmed = true; return toast('Silmek için tekrar bas'); }
+  deleteArmed = false;
+  delete P.scenes[curId];
+  for (const id in P.scenes) P.scenes[id].exits = P.scenes[id].exits.filter(e => e.to !== curId);
+  if (P.start === curId) P.start = Object.keys(P.scenes)[0];
+  curId = P.start; cur = P.scenes[curId]; sel = null;
+  refreshSceneSel(); changed(); closeModal();
+}
+function toWorld(e) {
+  const r = localRect(cv), p = toLocal(e.clientX, e.clientY);
+  return {x: (p.x - r.left - W / 2) / zoom + cam.x, y: (p.y - r.top - H / 2) / zoom + cam.y};
+}
+function paint(e) {
+  const p = toWorld(e);
+  const i = Math.floor(p.x / T), j = Math.floor(p.y / T);
+  if (i < 0 || j < 0 || i >= cur.w || j >= cur.h) return;
+  const key = i + ',' + j;
+  if (key === lastKey) return;
+  const first = lastKey === null;
+  lastKey = key;
+  applyTool(i, j, first);
+}
+cv.addEventListener('pointerdown', e => {
+  if (mode !== 'edit' || hudEdit() || $('modal').classList.contains('show')) return;
+  cv.setPointerCapture(e.pointerId); painting = true; lastKey = null; paint(e);
+});
+cv.addEventListener('pointermove', e => { if (painting) paint(e); });
+const stopPaint = () => { if (painting) { painting = false; changed(); } };
+cv.addEventListener('pointerup', stopPaint);
+cv.addEventListener('pointercancel', stopPaint);
+
+function setMode(m) {
+  mode = m;
+  document.body.className = m === 'play' ? 'mode-play' : 'mode-edit';
+  applyRotation();
+  closeDlg(); fade = 0; fadeDir = 0; pending = null;
+  if (m === 'play') { sel = null; startPlay(); maybeLoginPrompt(); }
+  else { sel = null; refreshSceneSel(); buildPalette(); }
+}
+
+/* ---------- joystick, tuşlar ve butonlar ---------- */
+const joy = $('joy'), knob = $('knob');
+let joyId = null;
+function moveJoy(e) {
+  const r = joy.getBoundingClientRect();
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  let dx = e.clientX - cx, dy = e.clientY - cy;
+  const max = r.width / 2 - 26, m = Math.hypot(dx, dy);
+  if (m > max) { dx *= max / m; dy *= max / m; }
+  knob.style.transform = `translate(${dx}px,${dy}px)`;
+  // döndürülmüş arayüzde joystick yönünü oyunun kendi eksenine çevir
+  const lv = rotated ? {x: dy, y: -dx} : {x: dx, y: dy};
+  joyV.x = lv.x / max; joyV.y = lv.y / max;
+}
+joy.addEventListener('pointerdown', e => {
+  if (hudEdit()) return;
+  joyId = e.pointerId; joy.setPointerCapture(e.pointerId); moveJoy(e);
+});
+joy.addEventListener('pointermove', e => { if (!hudEdit() && e.pointerId === joyId) moveJoy(e); });
+const endJoy = e => {
+  if (e.pointerId !== joyId) return;
+  joyId = null; joyV.x = 0; joyV.y = 0; knob.style.transform = 'translate(0,0)';
+};
+joy.addEventListener('pointerup', endJoy);
+joy.addEventListener('pointercancel', endJoy);
+btnA.addEventListener('pointerdown', e => { e.preventDefault(); if (mode === 'play') actionReq = true; });
+$('btnX').addEventListener('pointerdown', e => { e.preventDefault(); if (mode === 'play') interactReq = true; });
+$('btnZ').addEventListener('pointerdown', e => { e.preventDefault(); if (mode === 'play') dashReq = true; });
+$('btnQ').addEventListener('pointerdown', e => { e.preventDefault(); if (mode === 'play' && !uiBusy()) useSlot(state.hb); });
+$('btnE').addEventListener('pointerdown', e => {
+  e.preventDefault();
+  if (mode !== 'play') return;
+  if ($('modal').classList.contains('show')) closeModal(); else openInventory();
+});
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase(); keys[k] = true;
+  if (mode !== 'play') return;
+  if (k === ' ') { e.preventDefault(); actionReq = true; }
+  else if (k === 'x') interactReq = true;
+  else if (k === 'z') dashReq = true;
+  else if (k === 'e') { if ($('modal').classList.contains('show')) closeModal(); else openInventory(); }
+  else if (k === 'q') { if (!uiBusy()) useSlot(state.hb); }
+  else if (/^[1-9]$/.test(k)) selectSlot(+k - 1);
+});
+addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+addEventListener('resize', resize);
+addEventListener('resize', applyRotation);
+
+/* ---------- üst çubuk ---------- */
+$('btnPlay').onclick = () => setMode('play');
+$('btnEdit').onclick = () => setMode('edit');
+$('btnHud').onclick = () => {
+  const on = document.body.classList.toggle('hud-edit');
+  $('btnHud').classList.toggle('on', on);
+  if (on) toast('HUD öğelerini sürükleyerek yerleştir');
+  else changed();
+};
+$('btnRecipe').onclick = recipeModal;
+$('sceneSel').onchange = e => { curId = e.target.value; cur = P.scenes[curId]; sel = null; };
+// prompt() bazı önizleme/webview ortamlarında engellenir (null döner), bu yüzden kendi pencerimizi kullanıyoruz
+function newSceneModal() {
+  const input = el('input', {type: 'text', value: 'Yeni sahne', style: 'flex:1'});
+  openModal('Yeni sahne', [
+    row('Sahne adı', input),
+    row('', btn('Oluştur', '', () => {
+      const name = input.value.trim();
+      if (!name) return toast('Bir ad gir');
+      const id = 's' + Date.now().toString(36);
+      P.scenes[id] = {name, w: 16, h: 12, bg: '#1d2d1f', tiles: borderTiles(16, 12), spawn: {x: 2, y: 6}, npcs: [], exits: [], items: [], signs: [], enemies: [], rains: [], fires: [], benches: []};
+      curId = id; cur = P.scenes[id]; sel = null;
+      closeModal(); refreshSceneSel(); changed();
+      toast('Sahne oluşturuldu: ' + name);
+    }))
+  ]);
+  input.focus();
+}
+$('btnAddScene').onclick = newSceneModal;
+$('btnScene').onclick = sceneModal;
+$('mclose').onclick = closeModal;
+$('modal').addEventListener('click', e => { if (e.target === $('modal')) closeModal(); });
+$('btnExport').onclick = () => { save(); download('oyun.html', exportHTML(), 'text/html'); };
+$('btnBackup').onclick = () => download('proje.json', JSON.stringify(P, null, 2), 'application/json');
+$('btnLoad').onclick = () => $('fileIn').click();
+$('fileIn').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    P = sanitize(JSON.parse(await f.text()));
+    curId = P.start; cur = P.scenes[curId]; sel = null;
+    refreshSceneSel(); applyHud(); changed(); toast('Yüklendi');
+  } catch (err) { toast('Dosya hatalı'); }
+  e.target.value = '';
+};
+
+/* ---------- oyun düğmeleri ---------- */
+$('btnSaveGame').onclick = () => { if (!uiBusy()) saveGame(); };
+$('btnLoadGame').onclick = () => { if (!uiBusy()) loadGame(); };
+$('btnNewGame').onclick = () => { if (!uiBusy()) newGame(); };
+$('btnQuest').onclick = () => { if (!uiBusy()) showQuests(); };
+
+/* ---------- başlangıç ---------- */
+(function init() {
+  if (EMBED) {
+    P = sanitize(EMBED);
+    curId = P.start; cur = P.scenes[curId];
+    document.body.className = 'embedded mode-play';
+    mode = 'play';
+    startPlay();
+  } else {
+    P = sanitize(load() || defaultProject());
+    curId = P.start; cur = P.scenes[curId];
+    buildPalette();
+    setMode('edit');
+  }
+  applyHud();
+  renderHotbar();
+  resize();
+  applyRotation();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
